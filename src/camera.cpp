@@ -1,38 +1,39 @@
 #include "camera.h"
 #include "tools.h"
 
-camera::camera() {
+Camera::Camera() {
     position    = vec3(0.0f, 0.0f, 0.0f);
     Front       = vec3(0.0f, 0.0f, -1.0f);
     upDirection = vec3(0.0f, 1.0f, 0.0f);
 }
 
-void camera::move(float dx, float dy, float dz) {
+void Camera::move(float dx, float dy, float dz) {
     position.x += dx;
     position.y += dy;
     position.z += dz;
 }
 
-void camera::pitch(float angle) {
+void Camera::pitch(float angle) {
     vec3 rightDirection = glm::cross(Front, upDirection);
-    mat4 rotateMatrix = glm::rotate(mat4(1.0f), angle * 2.0f * PI / 180.0f, rightDirection);
-    vec4 _Front = vec4(Front, 0.0f);
-    _Front = rotateMatrix * _Front;
-    Front = vec3(_Front.x, _Front.y, _Front.z);
-    vec4 _upDirection = vec4(upDirection, 0.0f);
-    _upDirection = rotateMatrix * _upDirection;
-    upDirection = vec3(_upDirection.x, _upDirection.y, _upDirection.z);
+    mat4 rotateMatrix = glm::rotate(mat4(1.0f), angle * PI / 180.0f, rightDirection);
+    mat3 rotateMatrix3 = mat3(rotateMatrix);
+    Front = rotateMatrix3 * Front;
+    upDirection = rotateMatrix3 * upDirection;
+    // norm
+    Front = glm::normalize(Front);
+    upDirection = glm::normalize(upDirection);
 }
 
-void camera::yaw(float angle) {
+void Camera::yaw(float angle) {
     mat4 rotateMatrix = glm::rotate(mat4(1.0f), angle * 2 * PI / 180, upDirection);
-    vec4 _Front = vec4(Front, 0.0f);
-    _Front = rotateMatrix * _Front;
-    Front = vec3(_Front.x, _Front.y, _Front.z);
+    mat3 rotateMatrix3 = mat3(rotateMatrix);
+    Front = rotateMatrix3 * Front; 
+    // norm
+    Front = glm::normalize(Front);
 }
 
-mat4 camera::getViewMatrix() {
+mat4 Camera::getViewMatrix() {
     return glm::lookAt(position, position + Front, upDirection);
 }
 
-camera::~camera() {}
+Camera::~Camera() {}

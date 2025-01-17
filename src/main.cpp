@@ -7,20 +7,20 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include "tools.h"
+#include "camera.h"
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow *window);
 
 // 三角形的顶点数据
 float vertices[] = {
-    -0.433f, -0.25f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,  // 左下角
-    0.433f , -0.25f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f,  // 右下角
-    0.0f   ,  0.5f , 0.0f, 0.0f, 0.0f, 1.0f, 0.5f, 1.0f   // 上方中间
+    -0.433f, -0.25f, -0.25f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,  // 左下角
+    0.433f , -0.25f, -0.25f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f,  // 右下角
+    0.0f   ,  0.5f , -0.50f, 0.0f, 0.0f, 1.0f, 0.5f, 1.0f   // 上方中间
 };
 
 int main() {
 
-    
     // glfw init
     if (!glfwInit()) {
         std::cout << "Failed to initialize GLFW" << std::endl;
@@ -95,6 +95,8 @@ int main() {
 
     float angle = PI / 1200, cur = 0;
 
+    Camera camera;
+    
     while (!glfwWindowShouldClose(window)) {
         processInput(window);
 
