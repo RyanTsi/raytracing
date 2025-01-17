@@ -6,7 +6,6 @@
 #include <stb_image.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
-#include "tools.h"
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow *window);
@@ -52,6 +51,8 @@ int main() {
     Shader shader("src\\shaders\\vertexshader.glsl", "src\\shaders\\fragmentshader.glsl");
     
     // texture
+    int width, height, nrChannels;
+    unsigned char *data = stbi_load("C:/Users/solaryan/Desktop/CG/raytracing/assets/image.png", &width, &height, &nrChannels, 0);
     unsigned int texture;
     glGenTextures(1, &texture);
     glBindTexture(GL_TEXTURE_2D, texture);
@@ -61,12 +62,9 @@ int main() {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_R, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    
     // 加载并生成纹理
-    int width, height, nrChannels;
-    unsigned char *data = stbi_load("C:/Users/solaryan/Desktop/CG/raytracing/assets/image.png", &width, &height, &nrChannels, 0);
     if (data) {
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+        glTexImage2D(GL_TEXTURE_2D, 2, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
         glGenerateMipmap(GL_TEXTURE_2D);
     }
     else {
@@ -93,7 +91,7 @@ int main() {
     glBindBuffer(GL_ARRAY_BUFFER, 0); 
     glBindVertexArray(0);
 
-    float angle = PI / 1200, cur = 0;
+    float angle = 3.1415926535 / 1200, cur = 0;
 
     while (!glfwWindowShouldClose(window)) {
         processInput(window);

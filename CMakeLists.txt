@@ -24,26 +24,27 @@ include_directories(
 add_executable(${PROJECT_NAME} 
     src/main.cpp 
     src/shaders/shaderManager.cpp
+    src/camera.cpp
 )
 
-target_link_libraries(${PROJECT_NAME} PRIVATE glfw glad glm::glm stb_image)
+target_link_libraries(${PROJECT_NAME} PRIVATE glfw glad glm::glm)
 
 # glsl copy
 file(GLOB_RECURSE SHADER_FILES RELATIVE ${CMAKE_SOURCE_DIR}/src/shaders ${CMAKE_SOURCE_DIR}/src/shaders/*.glsl)
 
 foreach(SHADER_FILE IN LISTS SHADER_FILES)
     get_filename_component(SHADER_PATH "${SHADER_FILE}" PATH)
-    file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/shaders/${SHADER_PATH}")
+    file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/src/shaders/${SHADER_PATH}")
 
     add_custom_command(
-        OUTPUT "${CMAKE_BINARY_DIR}/shaders/${SHADER_FILE}"
+        OUTPUT "${CMAKE_BINARY_DIR}/src/shaders/${SHADER_FILE}"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/src/shaders/${SHADER_FILE}" "${CMAKE_BINARY_DIR}/src/shaders/${SHADER_FILE}"
         MAIN_DEPENDENCY "${CMAKE_SOURCE_DIR}/src/shaders/${SHADER_FILE}"
         COMMENT "Copying shader ${SHADER_FILE}"
         VERBATIM
     )
 
-    list(APPEND SHADERS_COPIED "${CMAKE_BINARY_DIR}/shaders/${SHADER_FILE}")
+    list(APPEND SHADERS_COPIED "${CMAKE_BINARY_DIR}/src/shaders/${SHADER_FILE}")
 endforeach()
 
 add_custom_target(CopyShaders ALL DEPENDS ${SHADERS_COPIED})
