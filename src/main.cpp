@@ -2,9 +2,8 @@
 #include <GLFW/glfw3.h>
 #include <iostream>
 #include "shaderManager.h"
-#include "stb_image.h"
+#include <stb_image.h>
 #include <glm/glm.hpp>
-
 #include <glm/gtc/type_ptr.hpp>
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);

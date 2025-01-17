@@ -5,6 +5,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 project(Renderer)
 
 set(GLAD_SOURCES_DIR ${PROJECT_SOURCE_DIR}/external/glad)
+set(STB_IMAGE_SOURCES_DIR ${PROJECT_SOURCE_DIR}/external/stb_image)
+
 set(CMAKE_PREFIX_PATH ${CMAKE_SOURCE_DIR}/external)
 
 find_package(glfw3 REQUIRED)
@@ -15,16 +17,16 @@ add_subdirectory(${GLAD_SOURCES_DIR})
 include_directories(
     ${PROJECT_SOURCE_DIR}/include
     ${GLAD_SOURCES_DIR}/include
+    ${STB_IMAGE_SOURCES_DIR}/include
     /usr/local/include
 )
 
 add_executable(${PROJECT_NAME} 
     src/main.cpp 
-    src/shaders/shaderManager.cpp 
-    src/stb_image.cpp
+    src/shaders/shaderManager.cpp
 )
 
-target_link_libraries(${PROJECT_NAME} PRIVATE glfw glad glm::glm)
+target_link_libraries(${PROJECT_NAME} PRIVATE glfw glad glm::glm stb_image)
 
 # glsl copy
 file(GLOB_RECURSE SHADER_FILES RELATIVE ${CMAKE_SOURCE_DIR}/src/shaders ${CMAKE_SOURCE_DIR}/src/shaders/*.glsl)
