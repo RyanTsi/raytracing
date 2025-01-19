@@ -12,12 +12,19 @@ using glm::mat3;
 class Camera {
 private:
     vec3 position;
-    vec3 Front;
+    vec3 front;
     vec3 upDirection;
+    float eyeFov;
+    float aspectRatio;
+    float zNear;
+    float zFar;
 public:
     Camera();
+    float speed;
+    float angularVelocity;
     mat4 getViewMatrix();
-    void move(float dx, float dy, float dz);
+    mat4 getProjectionMatrix();
+    void move(vec3 arrow);
     void pitch(float angle);
     void yaw(float angle);
     ~Camera();

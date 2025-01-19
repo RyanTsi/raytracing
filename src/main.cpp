@@ -9,14 +9,52 @@
 #include "camera.h"
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
-void processInput(GLFWwindow *window);
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
 
 // 三角形的顶点数据
 float vertices[] = {
-    -0.433f, -0.25f, -0.25f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,  // 左下角
-    0.433f , -0.25f, -0.25f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f,  // 右下角
-    0.0f   ,  0.5f , -0.50f, 0.0f, 0.0f, 1.0f, 0.5f, 1.0f   // 上方中间
+    -5.0f, -5.0f, -30.0f, 1.0f, 1.0f, 1.0f, 0.0f, 0.0f,
+     5.0f, -5.0f, -30.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f,
+     5.0f,  5.0f, -30.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
+     5.0f,  5.0f, -30.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
+    -5.0f,  5.0f, -30.0f, 1.0f, 1.0f, 1.0f, 0.0f, 1.0f,
+    -5.0f, -5.0f, -30.0f, 1.0f, 1.0f, 1.0f, 0.0f, 0.0f, // 0
+    -5.0f, -5.0f, -20.0f, 1.0f, 1.0f, 1.0f, 0.0f, 0.0f,
+     5.0f, -5.0f, -20.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f,
+     5.0f,  5.0f, -20.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
+     5.0f,  5.0f, -20.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
+    -5.0f,  5.0f, -20.0f, 1.0f, 1.0f, 1.0f, 0.0f, 1.0f,
+    -5.0f, -5.0f, -20.0f, 1.0f, 1.0f, 1.0f, 0.0f, 0.0f, // 1
+    -5.0f,  5.0f, -20.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f,
+    -5.0f,  5.0f, -30.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
+    -5.0f, -5.0f, -30.0f, 1.0f, 1.0f, 1.0f, 0.0f, 1.0f,
+    -5.0f, -5.0f, -30.0f, 1.0f, 1.0f, 1.0f, 0.0f, 1.0f,
+    -5.0f, -5.0f, -20.0f, 1.0f, 1.0f, 1.0f, 0.0f, 0.0f,
+    -5.0f,  5.0f, -20.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f, // 2
+     5.0f,  5.0f, -20.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f,
+     5.0f,  5.0f, -30.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
+     5.0f, -5.0f, -30.0f, 1.0f, 1.0f, 1.0f, 0.0f, 1.0f,
+     5.0f, -5.0f, -30.0f, 1.0f, 1.0f, 1.0f, 0.0f, 1.0f,
+     5.0f, -5.0f, -20.0f, 1.0f, 1.0f, 1.0f, 0.0f, 0.0f,
+     5.0f,  5.0f, -20.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f, // 3
+    -5.0f, -5.0f, -30.0f, 1.0f, 1.0f, 1.0f, 0.0f, 1.0f,
+     5.0f, -5.0f, -30.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
+     5.0f, -5.0f, -20.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f,
+     5.0f, -5.0f, -20.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f,
+    -5.0f, -5.0f, -20.0f, 1.0f, 1.0f, 1.0f, 0.0f, 0.0f,
+    -5.0f, -5.0f, -30.0f, 1.0f, 1.0f, 1.0f, 0.0f, 1.0f, // 4
+    -5.0f,  5.0f, -30.0f, 1.0f, 1.0f, 1.0f, 0.0f, 1.0f,
+     5.0f,  5.0f, -30.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
+     5.0f,  5.0f, -20.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f,
+     5.0f,  5.0f, -20.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f,
+    -5.0f,  5.0f, -20.0f, 1.0f, 1.0f, 1.0f, 0.0f, 0.0f,
+    -5.0f,  5.0f, -30.0f, 1.0f, 1.0f, 1.0f, 0.0f, 1.0f  // 5
 };
+
+
+Camera camera;
+int moveState[4];
+glm::vec3 moveArrow;
 
 int main() {
 
@@ -31,12 +69,12 @@ int main() {
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
     // create a window
-    GLFWwindow* window = glfwCreateWindow(800, 600, "LearnOpenGL", NULL, NULL);
+    GLFWwindow* window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Renderer", NULL, NULL);
     if (window == NULL) {
         std::cout << "Failed to create GLFW window" << std::endl;
         glfwTerminate();
         return -1;
-    }
+    } 
     glfwMakeContextCurrent(window);
 
     // load glad
@@ -44,9 +82,11 @@ int main() {
     printf("GL %d.%d\n", GLAD_VERSION_MAJOR(version), GLAD_VERSION_MINOR(version));
 
     // set init state and callback function
-    glViewport(0, 0, 600, 600);
+    glViewport(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+    glfwSetKeyCallback(window, key_callback);
 
+    glEnable(GL_DEPTH_TEST);
     // my shader
     Shader shader("src\\shaders\\vertexshader.glsl", "src\\shaders\\fragmentshader.glsl");
     
@@ -74,13 +114,16 @@ int main() {
     stbi_image_free(data);
 
     
-    unsigned int VBO, VAO;
+    unsigned int VBO, VAO, EBO;
     glGenVertexArrays(1, &VAO);
     glGenBuffers(1, &VBO);
+    // glGenBuffers(1, &EBO);
     glBindVertexArray(VAO);
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    // glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
     // transfer data
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    // glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
     // set VAO
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
@@ -92,37 +135,43 @@ int main() {
     glBindBuffer(GL_ARRAY_BUFFER, 0); 
     glBindVertexArray(0);
 
-    float angle = PI / 1200, cur = 0;
-
-    Camera camera;
     
+    glm::mat4 ProjectionMatrix = camera.getProjectionMatrix(); 
+    for(int i = 0; i < 4; i ++) {
+        for(int j = 0; j < 4; j ++) {
+            std::cout << ProjectionMatrix[i][j] << " ";
+        }
+        std::cout << std::endl;
+    }
+    double last_time = glfwGetTime(), detaTime;
+	double fps = 60, counter_time = 0, counter_frame = 0;
+    // render loop
     while (!glfwWindowShouldClose(window)) {
-        processInput(window);
+        detaTime = glfwGetTime() - last_time;
+        last_time += detaTime;
+        counter_frame ++;
+        counter_time += detaTime;
+        if(counter_time > 1) {
+            fps = counter_frame / counter_time, counter_frame = counter_time = 0;
+            std::cout << fps << std::endl;
+        }
 
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
-
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // also clear the depth buffer now!
 
         // 使用着色器程序，使用后才能 set
         shader.use();
 
         // -- add --
-        float matrix[] = {
-            cos(cur), -sin(cur), 0, 0,
-            sin(cur),  cos(cur), 0, 0,
-            0, 0, 1, 0,
-            0, 0, 0, 1
-        };
-
-        glm::mat4 rotate = glm::make_mat4(matrix);
-        shader.setMat4("rotate", rotate);
-        cur += angle;
+        mat4 modelViewProjectionMatrix = ProjectionMatrix * camera.getViewMatrix();
+        shader.setMat4("modelViewProjectionMatrix", modelViewProjectionMatrix);
         // -- end --
         
         glBindTexture(GL_TEXTURE_2D, texture);
 
         glBindVertexArray(VAO);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
+        // glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+        glDrawArrays(GL_TRIANGLES, 0, 36);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
@@ -131,15 +180,30 @@ int main() {
     // release data
     glDeleteVertexArrays(1, &VAO);
     glDeleteBuffers(1, &VBO);
+    glDeleteBuffers(2, &EBO);
     shader.del();
     glfwTerminate();
 
     return 0;
 }
 
-void processInput(GLFWwindow *window) {
-    if(glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
-        glfwSetWindowShouldClose(window, true);
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+    if (key == GLFW_KEY_W) moveState[0] = action;
+    if (key == GLFW_KEY_S) moveState[1] = action;
+    if (key == GLFW_KEY_D) moveState[2] = action;
+    if (key == GLFW_KEY_A) moveState[3] = action;
+    moveArrow.z = 1.0f * moveState[0] - moveState[1];
+    moveArrow.x = 1.0f * moveState[2] - moveState[3];
+    // std::cout << moveArrow.x << " " << moveArrow.y << " " << moveArrow.z << std::endl;
+    camera.move(moveArrow);
+    if (key == GLFW_KEY_Q && action == GLFW_REPEAT) {
+        camera.yaw(camera.angularVelocity);
+    } 
+    if (key == GLFW_KEY_E && action == GLFW_REPEAT) {
+        camera.yaw(-camera.angularVelocity);
+    }
+    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
+        glfwSetWindowShouldClose(window, GL_TRUE);
     }
 }
 

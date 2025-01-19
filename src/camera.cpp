@@ -2,38 +2,49 @@
 #include "tools.h"
 
 Camera::Camera() {
-    position    = vec3(0.0f, 0.0f, 0.0f);
-    Front       = vec3(0.0f, 0.0f, -1.0f);
-    upDirection = vec3(0.0f, 1.0f, 0.0f);
+    position        = vec3(0.0f, 0.0f, 0.0f);
+    front           = vec3(0.0f, 0.0f, -1.0f);
+    upDirection     = vec3(0.0f, 1.0f, 0.0f);
+    eyeFov          = 45.0f;
+    aspectRatio     = 1.0f * SCREEN_WIDTH / SCREEN_HEIGHT;
+    zNear           = 0.1f;
+    zFar            = 100.0f;
+    speed           = 0.1f;
+    angularVelocity = 1.0f;
 }
 
-void Camera::move(float dx, float dy, float dz) {
-    position.x += dx;
-    position.y += dy;
-    position.z += dz;
+void Camera::move(glm::vec3 arrow) {
+    if(glm::length(arrow) < 0.1f) return;
+    vec3 rightDirection = glm::cross(front, upDirection);
+    arrow = glm::normalize(front * arrow.z + upDirection * arrow.y + rightDirection * arrow.x);
+    position += arrow * speed;
 }
 
 void Camera::pitch(float angle) {
-    vec3 rightDirection = glm::cross(Front, upDirection);
+    vec3 rightDirection = glm::cross(front, upDirection);
     mat4 rotateMatrix = glm::rotate(mat4(1.0f), angle * PI / 180.0f, rightDirection);
     mat3 rotateMatrix3 = mat3(rotateMatrix);
-    Front = rotateMatrix3 * Front;
+    front = rotateMatrix3 * front;
     upDirection = rotateMatrix3 * upDirection;
     // norm
-    Front = glm::normalize(Front);
+    front = glm::normalize(front);
     upDirection = glm::normalize(upDirection);
 }
 
 void Camera::yaw(float angle) {
-    mat4 rotateMatrix = glm::rotate(mat4(1.0f), angle * 2 * PI / 180, upDirection);
+    mat4 rotateMatrix = glm::rotate(mat4(1.0f), angle * PI / 180, upDirection);
     mat3 rotateMatrix3 = mat3(rotateMatrix);
-    Front = rotateMatrix3 * Front; 
+    front = rotateMatrix3 * front; 
     // norm
-    Front = glm::normalize(Front);
+    front = glm::normalize(front);
 }
 
 mat4 Camera::getViewMatrix() {
-    return glm::lookAt(position, position + Front, upDirection);
+    return glm::lookAt(position, position + front, upDirection);
+}
+
+mat4 Camera::getProjectionMatrix() {
+    return glm::perspective(glm::radians(eyeFov), aspectRatio, zNear, zFar);
 }
 
 Camera::~Camera() {}
