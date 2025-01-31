@@ -7,57 +7,59 @@
 #include <glm/gtc/type_ptr.hpp>
 #include "tools.h"
 #include "camera.h"
+#include "model.h"
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
 
 // 三角形的顶点数据
 float vertices[] = {
-    -5.0f, -5.0f, -30.0f, 1.0f, 1.0f, 1.0f, 0.0f, 0.0f,
-     5.0f, -5.0f, -30.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f,
-     5.0f,  5.0f, -30.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
-     5.0f,  5.0f, -30.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
-    -5.0f,  5.0f, -30.0f, 1.0f, 1.0f, 1.0f, 0.0f, 1.0f,
-    -5.0f, -5.0f, -30.0f, 1.0f, 1.0f, 1.0f, 0.0f, 0.0f, // 0
-    -5.0f, -5.0f, -20.0f, 1.0f, 1.0f, 1.0f, 0.0f, 0.0f,
-     5.0f, -5.0f, -20.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f,
-     5.0f,  5.0f, -20.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
-     5.0f,  5.0f, -20.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
-    -5.0f,  5.0f, -20.0f, 1.0f, 1.0f, 1.0f, 0.0f, 1.0f,
-    -5.0f, -5.0f, -20.0f, 1.0f, 1.0f, 1.0f, 0.0f, 0.0f, // 1
-    -5.0f,  5.0f, -20.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f,
-    -5.0f,  5.0f, -30.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
-    -5.0f, -5.0f, -30.0f, 1.0f, 1.0f, 1.0f, 0.0f, 1.0f,
-    -5.0f, -5.0f, -30.0f, 1.0f, 1.0f, 1.0f, 0.0f, 1.0f,
-    -5.0f, -5.0f, -20.0f, 1.0f, 1.0f, 1.0f, 0.0f, 0.0f,
-    -5.0f,  5.0f, -20.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f, // 2
-     5.0f,  5.0f, -20.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f,
-     5.0f,  5.0f, -30.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
-     5.0f, -5.0f, -30.0f, 1.0f, 1.0f, 1.0f, 0.0f, 1.0f,
-     5.0f, -5.0f, -30.0f, 1.0f, 1.0f, 1.0f, 0.0f, 1.0f,
-     5.0f, -5.0f, -20.0f, 1.0f, 1.0f, 1.0f, 0.0f, 0.0f,
-     5.0f,  5.0f, -20.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f, // 3
-    -5.0f, -5.0f, -30.0f, 1.0f, 1.0f, 1.0f, 0.0f, 1.0f,
-     5.0f, -5.0f, -30.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
-     5.0f, -5.0f, -20.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f,
-     5.0f, -5.0f, -20.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f,
-    -5.0f, -5.0f, -20.0f, 1.0f, 1.0f, 1.0f, 0.0f, 0.0f,
-    -5.0f, -5.0f, -30.0f, 1.0f, 1.0f, 1.0f, 0.0f, 1.0f, // 4
-    -5.0f,  5.0f, -30.0f, 1.0f, 1.0f, 1.0f, 0.0f, 1.0f,
-     5.0f,  5.0f, -30.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
-     5.0f,  5.0f, -20.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f,
-     5.0f,  5.0f, -20.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f,
-    -5.0f,  5.0f, -20.0f, 1.0f, 1.0f, 1.0f, 0.0f, 0.0f,
-    -5.0f,  5.0f, -30.0f, 1.0f, 1.0f, 1.0f, 0.0f, 1.0f  // 5
+    -5.0f, -5.0f, -30.0f, 1.0f, 0.5f, 0.31f, 0.0f, 0.0f,  0.0f,  0.0f, -1.0f,
+     5.0f, -5.0f, -30.0f, 1.0f, 0.5f, 0.31f, 1.0f, 0.0f,  0.0f,  0.0f, -1.0f,
+     5.0f,  5.0f, -30.0f, 1.0f, 0.5f, 0.31f, 1.0f, 1.0f,  0.0f,  0.0f, -1.0f,
+     5.0f,  5.0f, -30.0f, 1.0f, 0.5f, 0.31f, 1.0f, 1.0f,  0.0f,  0.0f, -1.0f,
+    -5.0f,  5.0f, -30.0f, 1.0f, 0.5f, 0.31f, 0.0f, 1.0f,  0.0f,  0.0f, -1.0f,
+    -5.0f, -5.0f, -30.0f, 1.0f, 0.5f, 0.31f, 0.0f, 0.0f,  0.0f,  0.0f, -1.0f, // 0
+    -5.0f, -5.0f, -20.0f, 1.0f, 0.5f, 0.31f, 0.0f, 0.0f,  0.0f,  0.0f,  1.0f,
+     5.0f, -5.0f, -20.0f, 1.0f, 0.5f, 0.31f, 1.0f, 0.0f,  0.0f,  0.0f,  1.0f,
+     5.0f,  5.0f, -20.0f, 1.0f, 0.5f, 0.31f, 1.0f, 1.0f,  0.0f,  0.0f,  1.0f,
+     5.0f,  5.0f, -20.0f, 1.0f, 0.5f, 0.31f, 1.0f, 1.0f,  0.0f,  0.0f,  1.0f,
+    -5.0f,  5.0f, -20.0f, 1.0f, 0.5f, 0.31f, 0.0f, 1.0f,  0.0f,  0.0f,  1.0f,
+    -5.0f, -5.0f, -20.0f, 1.0f, 0.5f, 0.31f, 0.0f, 0.0f,  0.0f,  0.0f,  1.0f, // 1
+    -5.0f,  5.0f, -20.0f, 1.0f, 0.5f, 0.31f, 1.0f, 0.0f, -1.0f,  0.0f,  0.0f,
+    -5.0f,  5.0f, -30.0f, 1.0f, 0.5f, 0.31f, 1.0f, 1.0f, -1.0f,  0.0f,  0.0f,
+    -5.0f, -5.0f, -30.0f, 1.0f, 0.5f, 0.31f, 0.0f, 1.0f, -1.0f,  0.0f,  0.0f,
+    -5.0f, -5.0f, -30.0f, 1.0f, 0.5f, 0.31f, 0.0f, 1.0f, -1.0f,  0.0f,  0.0f,
+    -5.0f, -5.0f, -20.0f, 1.0f, 0.5f, 0.31f, 0.0f, 0.0f, -1.0f,  0.0f,  0.0f,
+    -5.0f,  5.0f, -20.0f, 1.0f, 0.5f, 0.31f, 1.0f, 0.0f, -1.0f,  0.0f,  0.0f, // 2
+     5.0f,  5.0f, -20.0f, 1.0f, 0.5f, 0.31f, 1.0f, 0.0f,  1.0f,  0.0f,  0.0f,
+     5.0f,  5.0f, -30.0f, 1.0f, 0.5f, 0.31f, 1.0f, 1.0f,  1.0f,  0.0f,  0.0f,
+     5.0f, -5.0f, -30.0f, 1.0f, 0.5f, 0.31f, 0.0f, 1.0f,  1.0f,  0.0f,  0.0f,
+     5.0f, -5.0f, -30.0f, 1.0f, 0.5f, 0.31f, 0.0f, 1.0f,  1.0f,  0.0f,  0.0f,
+     5.0f, -5.0f, -20.0f, 1.0f, 0.5f, 0.31f, 0.0f, 0.0f,  1.0f,  0.0f,  0.0f,
+     5.0f,  5.0f, -20.0f, 1.0f, 0.5f, 0.31f, 1.0f, 0.0f,  1.0f,  0.0f,  0.0f, // 3
+    -5.0f, -5.0f, -30.0f, 1.0f, 0.5f, 0.31f, 0.0f, 1.0f,  0.0f, -1.0f,  0.0f,
+     5.0f, -5.0f, -30.0f, 1.0f, 0.5f, 0.31f, 1.0f, 1.0f,  0.0f, -1.0f,  0.0f,
+     5.0f, -5.0f, -20.0f, 1.0f, 0.5f, 0.31f, 1.0f, 0.0f,  0.0f, -1.0f,  0.0f,
+     5.0f, -5.0f, -20.0f, 1.0f, 0.5f, 0.31f, 1.0f, 0.0f,  0.0f, -1.0f,  0.0f,
+    -5.0f, -5.0f, -20.0f, 1.0f, 0.5f, 0.31f, 0.0f, 0.0f,  0.0f, -1.0f,  0.0f,
+    -5.0f, -5.0f, -30.0f, 1.0f, 0.5f, 0.31f, 0.0f, 1.0f,  0.0f, -1.0f,  0.0f, // 4
+    -5.0f,  5.0f, -30.0f, 1.0f, 0.5f, 0.31f, 0.0f, 1.0f,  0.0f,  1.0f,  0.0f,
+     5.0f,  5.0f, -30.0f, 1.0f, 0.5f, 0.31f, 1.0f, 1.0f,  0.0f,  1.0f,  0.0f,
+     5.0f,  5.0f, -20.0f, 1.0f, 0.5f, 0.31f, 1.0f, 0.0f,  0.0f,  1.0f,  0.0f,
+     5.0f,  5.0f, -20.0f, 1.0f, 0.5f, 0.31f, 1.0f, 0.0f,  0.0f,  1.0f,  0.0f,
+    -5.0f,  5.0f, -20.0f, 1.0f, 0.5f, 0.31f, 0.0f, 0.0f,  0.0f,  1.0f,  0.0f,
+    -5.0f,  5.0f, -30.0f, 1.0f, 0.5f, 0.31f, 0.0f, 1.0f,  0.0f,  1.0f,  0.0f,  // 5
 };
-
+    
+glm::vec3 lightPos(10, 10, -20), lightColor(1.0f, 1.0f, 1.0f);
 
 Camera camera;
 int moveState[4];
 glm::vec3 moveArrow;
 
-int main() {
 
+int main() {
     // glfw init
     if (!glfwInit()) {
         std::cout << "Failed to initialize GLFW" << std::endl;
@@ -125,24 +127,19 @@ int main() {
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
     // glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
     // set VAO
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 11 * sizeof(float), (void*)0);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 11 * sizeof(float), (void*)(3 * sizeof(float)));
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 11 * sizeof(float), (void*)(6 * sizeof(float)));
+    glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 11 * sizeof(float), (void*)(8 * sizeof(float)));
     glEnableVertexAttribArray(0);
     glEnableVertexAttribArray(1);
     glEnableVertexAttribArray(2);
+    glEnableVertexAttribArray(3);
 
     glBindBuffer(GL_ARRAY_BUFFER, 0); 
     glBindVertexArray(0);
 
-    
-    glm::mat4 ProjectionMatrix = camera.getProjectionMatrix(); 
-    for(int i = 0; i < 4; i ++) {
-        for(int j = 0; j < 4; j ++) {
-            std::cout << ProjectionMatrix[i][j] << " ";
-        }
-        std::cout << std::endl;
-    }
+    Model model("C:\\Users\\solaryan\\Desktop\\CG\\test\\assets\\test.obj");
     double last_time = glfwGetTime(), detaTime;
 	double fps = 60, counter_time = 0, counter_frame = 0;
     // render loop
@@ -163,8 +160,12 @@ int main() {
         shader.use();
 
         // -- add --
-        mat4 modelViewProjectionMatrix = ProjectionMatrix * camera.getViewMatrix();
-        shader.setMat4("modelViewProjectionMatrix", modelViewProjectionMatrix);
+        shader.setMat4("project", camera.getProjectionMatrix());
+        shader.setMat4("view", camera.getViewMatrix());
+        glm::mat4 model(1.0f);
+        shader.setMat4("model", model);
+        shader.setVec3("lightPos", lightPos);
+        shader.setVec3("lightColor", lightColor);
         // -- end --
         
         glBindTexture(GL_TEXTURE_2D, texture);
@@ -201,6 +202,12 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
     } 
     if (key == GLFW_KEY_E && action == GLFW_REPEAT) {
         camera.yaw(-camera.angularVelocity);
+    }
+    if (key == GLFW_KEY_SPACE && action == GLFW_REPEAT) {
+        camera.up();
+    }
+    if (key == GLFW_KEY_SPACE && mods == GLFW_MOD_SHIFT) {
+        camera.down();
     }
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
         glfwSetWindowShouldClose(window, GL_TRUE);

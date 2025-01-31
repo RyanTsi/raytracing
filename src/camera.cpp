@@ -2,14 +2,14 @@
 #include "tools.h"
 
 Camera::Camera() {
-    position        = vec3(0.0f, 0.0f, 0.0f);
+    position        = vec3(0.0f, 0.0f,  0.0f);
     front           = vec3(0.0f, 0.0f, -1.0f);
-    upDirection     = vec3(0.0f, 1.0f, 0.0f);
+    upDirection     = vec3(0.0f, 1.0f,  0.0f);
     eyeFov          = 45.0f;
     aspectRatio     = 1.0f * SCREEN_WIDTH / SCREEN_HEIGHT;
     zNear           = 0.1f;
     zFar            = 100.0f;
-    speed           = 0.1f;
+    speed           = 1.0f;
     angularVelocity = 1.0f;
 }
 
@@ -18,6 +18,14 @@ void Camera::move(glm::vec3 arrow) {
     vec3 rightDirection = glm::cross(front, upDirection);
     arrow = glm::normalize(front * arrow.z + upDirection * arrow.y + rightDirection * arrow.x);
     position += arrow * speed;
+}
+
+void Camera::up() {
+    move(glm::vec3(0, 1, 0));
+}
+
+void Camera::down() {
+    move(glm::vec3(0, -1, 0));
 }
 
 void Camera::pitch(float angle) {

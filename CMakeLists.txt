@@ -39,7 +39,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     glad
     stb_image
     glm::glm
-    assimp-vc143-mt.lib
+    ${ASSIMP_LIBRARIES}
 )
 
 # glsl copy
@@ -61,3 +61,17 @@ foreach(SHADER_FILE IN LISTS SHADER_FILES)
 endforeach()
 
 add_custom_target(CopyShaders ALL DEPENDS ${SHADERS_COPIED})
+
+# copy .dll
+file(GLOB ASSIMP_DLLS "${PROJECT_SOURCE_DIR}/external/Assimp/bin/*.dll")
+
+foreach(DLL_FILE IN LISTS ASSIMP_DLLS)
+    get_filename_component(DLL_NAME "${DLL_FILE}" NAME)
+    add_custom_command(
+        TARGET ${PROJECT_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${DLL_FILE}"
+            $<TARGET_FILE_DIR:${PROJECT_NAME}>/${DLL_NAME}
+        COMMENT "Copying Assimp DLL ${DLL_NAME}"
+    )
+endforeach()

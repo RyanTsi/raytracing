@@ -2,7 +2,7 @@
 
 #include <glm/glm.hpp>
 #include <glm/ext/matrix_transform.hpp>
-#include <glm\gtc\quaternion.hpp>
+#include <glm/gtc/quaternion.hpp>
 
 using glm::vec3;
 using glm::vec4;
@@ -25,6 +25,8 @@ public:
     mat4 getViewMatrix();
     mat4 getProjectionMatrix();
     void move(vec3 arrow);
+    void up();
+    void down();
     void pitch(float angle);
     void yaw(float angle);
     ~Camera();
