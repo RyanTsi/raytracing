@@ -12,52 +12,11 @@
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
 
-// 三角形的顶点数据
-float vertices[] = {
-    -5.0f, -5.0f, -30.0f, 1.0f, 0.5f, 0.31f, 0.0f, 0.0f,  0.0f,  0.0f, -1.0f,
-     5.0f, -5.0f, -30.0f, 1.0f, 0.5f, 0.31f, 1.0f, 0.0f,  0.0f,  0.0f, -1.0f,
-     5.0f,  5.0f, -30.0f, 1.0f, 0.5f, 0.31f, 1.0f, 1.0f,  0.0f,  0.0f, -1.0f,
-     5.0f,  5.0f, -30.0f, 1.0f, 0.5f, 0.31f, 1.0f, 1.0f,  0.0f,  0.0f, -1.0f,
-    -5.0f,  5.0f, -30.0f, 1.0f, 0.5f, 0.31f, 0.0f, 1.0f,  0.0f,  0.0f, -1.0f,
-    -5.0f, -5.0f, -30.0f, 1.0f, 0.5f, 0.31f, 0.0f, 0.0f,  0.0f,  0.0f, -1.0f, // 0
-    -5.0f, -5.0f, -20.0f, 1.0f, 0.5f, 0.31f, 0.0f, 0.0f,  0.0f,  0.0f,  1.0f,
-     5.0f, -5.0f, -20.0f, 1.0f, 0.5f, 0.31f, 1.0f, 0.0f,  0.0f,  0.0f,  1.0f,
-     5.0f,  5.0f, -20.0f, 1.0f, 0.5f, 0.31f, 1.0f, 1.0f,  0.0f,  0.0f,  1.0f,
-     5.0f,  5.0f, -20.0f, 1.0f, 0.5f, 0.31f, 1.0f, 1.0f,  0.0f,  0.0f,  1.0f,
-    -5.0f,  5.0f, -20.0f, 1.0f, 0.5f, 0.31f, 0.0f, 1.0f,  0.0f,  0.0f,  1.0f,
-    -5.0f, -5.0f, -20.0f, 1.0f, 0.5f, 0.31f, 0.0f, 0.0f,  0.0f,  0.0f,  1.0f, // 1
-    -5.0f,  5.0f, -20.0f, 1.0f, 0.5f, 0.31f, 1.0f, 0.0f, -1.0f,  0.0f,  0.0f,
-    -5.0f,  5.0f, -30.0f, 1.0f, 0.5f, 0.31f, 1.0f, 1.0f, -1.0f,  0.0f,  0.0f,
-    -5.0f, -5.0f, -30.0f, 1.0f, 0.5f, 0.31f, 0.0f, 1.0f, -1.0f,  0.0f,  0.0f,
-    -5.0f, -5.0f, -30.0f, 1.0f, 0.5f, 0.31f, 0.0f, 1.0f, -1.0f,  0.0f,  0.0f,
-    -5.0f, -5.0f, -20.0f, 1.0f, 0.5f, 0.31f, 0.0f, 0.0f, -1.0f,  0.0f,  0.0f,
-    -5.0f,  5.0f, -20.0f, 1.0f, 0.5f, 0.31f, 1.0f, 0.0f, -1.0f,  0.0f,  0.0f, // 2
-     5.0f,  5.0f, -20.0f, 1.0f, 0.5f, 0.31f, 1.0f, 0.0f,  1.0f,  0.0f,  0.0f,
-     5.0f,  5.0f, -30.0f, 1.0f, 0.5f, 0.31f, 1.0f, 1.0f,  1.0f,  0.0f,  0.0f,
-     5.0f, -5.0f, -30.0f, 1.0f, 0.5f, 0.31f, 0.0f, 1.0f,  1.0f,  0.0f,  0.0f,
-     5.0f, -5.0f, -30.0f, 1.0f, 0.5f, 0.31f, 0.0f, 1.0f,  1.0f,  0.0f,  0.0f,
-     5.0f, -5.0f, -20.0f, 1.0f, 0.5f, 0.31f, 0.0f, 0.0f,  1.0f,  0.0f,  0.0f,
-     5.0f,  5.0f, -20.0f, 1.0f, 0.5f, 0.31f, 1.0f, 0.0f,  1.0f,  0.0f,  0.0f, // 3
-    -5.0f, -5.0f, -30.0f, 1.0f, 0.5f, 0.31f, 0.0f, 1.0f,  0.0f, -1.0f,  0.0f,
-     5.0f, -5.0f, -30.0f, 1.0f, 0.5f, 0.31f, 1.0f, 1.0f,  0.0f, -1.0f,  0.0f,
-     5.0f, -5.0f, -20.0f, 1.0f, 0.5f, 0.31f, 1.0f, 0.0f,  0.0f, -1.0f,  0.0f,
-     5.0f, -5.0f, -20.0f, 1.0f, 0.5f, 0.31f, 1.0f, 0.0f,  0.0f, -1.0f,  0.0f,
-    -5.0f, -5.0f, -20.0f, 1.0f, 0.5f, 0.31f, 0.0f, 0.0f,  0.0f, -1.0f,  0.0f,
-    -5.0f, -5.0f, -30.0f, 1.0f, 0.5f, 0.31f, 0.0f, 1.0f,  0.0f, -1.0f,  0.0f, // 4
-    -5.0f,  5.0f, -30.0f, 1.0f, 0.5f, 0.31f, 0.0f, 1.0f,  0.0f,  1.0f,  0.0f,
-     5.0f,  5.0f, -30.0f, 1.0f, 0.5f, 0.31f, 1.0f, 1.0f,  0.0f,  1.0f,  0.0f,
-     5.0f,  5.0f, -20.0f, 1.0f, 0.5f, 0.31f, 1.0f, 0.0f,  0.0f,  1.0f,  0.0f,
-     5.0f,  5.0f, -20.0f, 1.0f, 0.5f, 0.31f, 1.0f, 0.0f,  0.0f,  1.0f,  0.0f,
-    -5.0f,  5.0f, -20.0f, 1.0f, 0.5f, 0.31f, 0.0f, 0.0f,  0.0f,  1.0f,  0.0f,
-    -5.0f,  5.0f, -30.0f, 1.0f, 0.5f, 0.31f, 0.0f, 1.0f,  0.0f,  1.0f,  0.0f,  // 5
-};
-    
 glm::vec3 lightPos(10, 10, -20), lightColor(1.0f, 1.0f, 1.0f);
 
-Camera camera;
+Camera camera(0, 0, 10);
 int moveState[4];
 glm::vec3 moveArrow;
-
 
 int main() {
     // glfw init
@@ -89,61 +48,20 @@ int main() {
     glfwSetKeyCallback(window, key_callback);
 
     glEnable(GL_DEPTH_TEST);
+
     // my shader
-    Shader shader("src\\shaders\\vertexshader.glsl", "src\\shaders\\fragmentshader.glsl");
-    
-    // texture
-    unsigned int texture;
-    glGenTextures(1, &texture);
-    glBindTexture(GL_TEXTURE_2D, texture);
-    // 为当前绑定的纹理对象设置环绕、过滤方式
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);   
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_R, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    
-    // 加载并生成纹理
-    int width, height, nrChannels;
-    unsigned char *data = stbi_load("C:/Users/solaryan/Desktop/CG/raytracing/assets/image.png", &width, &height, &nrChannels, 0);
-    if (data) {
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
-        glGenerateMipmap(GL_TEXTURE_2D);
-    }
-    else {
-        std::cout << "Failed to load texture" << std::endl;
-    }
-    stbi_image_free(data);
+    Shader shader("C:/Users/solaryan/Desktop/CG/raytracing\\src\\shaders\\vertexshader.glsl", "C:/Users/solaryan/Desktop/CG/raytracing\\src\\shaders\\fragmentshader.glsl");
+    Model Xmodel("C:\\Users\\solaryan\\Desktop\\CG\\raytracing\\assets\\cube\\cubeobj.obj");
 
-    
-    unsigned int VBO, VAO, EBO;
-    glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &VBO);
-    // glGenBuffers(1, &EBO);
-    glBindVertexArray(VAO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    // glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    // transfer data
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-    // glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
-    // set VAO
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 11 * sizeof(float), (void*)0);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 11 * sizeof(float), (void*)(3 * sizeof(float)));
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 11 * sizeof(float), (void*)(6 * sizeof(float)));
-    glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 11 * sizeof(float), (void*)(8 * sizeof(float)));
-    glEnableVertexAttribArray(0);
-    glEnableVertexAttribArray(1);
-    glEnableVertexAttribArray(2);
-    glEnableVertexAttribArray(3);
+    std::cout << "------ Begin ------" << std::endl;
 
-    glBindBuffer(GL_ARRAY_BUFFER, 0); 
-    glBindVertexArray(0);
-
-    Model model("C:\\Users\\solaryan\\Desktop\\CG\\test\\assets\\test.obj");
     double last_time = glfwGetTime(), detaTime;
 	double fps = 60, counter_time = 0, counter_frame = 0;
+
     // render loop
     while (!glfwWindowShouldClose(window)) {
+        
+        // ------ record ------
         detaTime = glfwGetTime() - last_time;
         last_time += detaTime;
         counter_frame ++;
@@ -152,6 +70,7 @@ int main() {
             fps = counter_frame / counter_time, counter_frame = counter_time = 0;
             std::cout << fps << std::endl;
         }
+        // ------ record ------
 
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // also clear the depth buffer now!
@@ -168,20 +87,13 @@ int main() {
         shader.setVec3("lightColor", lightColor);
         // -- end --
         
-        glBindTexture(GL_TEXTURE_2D, texture);
-
-        glBindVertexArray(VAO);
-        // glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
-        glDrawArrays(GL_TRIANGLES, 0, 36);
+        Xmodel.draw(shader);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
 
-    // release data
-    glDeleteVertexArrays(1, &VAO);
-    glDeleteBuffers(1, &VBO);
-    glDeleteBuffers(2, &EBO);
+    // ------ release ------
     shader.del();
     glfwTerminate();
 

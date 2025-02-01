@@ -11,9 +11,9 @@
 
 class Shader {
 private:
+public:
     // 程序ID
     unsigned int ID;
-public:
     // 构造器读取并构建着色器
     Shader(const char* vertexPath, const char* fragmentPath);
     void use();

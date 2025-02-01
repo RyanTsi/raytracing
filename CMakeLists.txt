@@ -32,6 +32,7 @@ add_executable(${PROJECT_NAME}
     src/main.cpp 
     src/shaders/shaderManager.cpp
     src/camera.cpp
+    src/model.cpp
 )
 
 target_link_libraries(${PROJECT_NAME} PRIVATE

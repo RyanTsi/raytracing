@@ -20,6 +20,7 @@ private:
     float zFar;
 public:
     Camera();
+    Camera(float x, float y, float z);
     float speed;
     float angularVelocity;
     mat4 getViewMatrix();
