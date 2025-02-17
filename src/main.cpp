@@ -26,7 +26,7 @@ int main() {
     }
 
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
     // create a window
@@ -50,8 +50,8 @@ int main() {
     glEnable(GL_DEPTH_TEST);
 
     // my shader
-    Shader shader("C:/Users/solaryan/Desktop/CG/raytracing\\src\\shaders\\vertexshader.glsl", "C:/Users/solaryan/Desktop/CG/raytracing\\src\\shaders\\fragmentshader.glsl");
-    Model Xmodel("C:\\Users\\solaryan\\Desktop\\CG\\raytracing\\assets\\cube\\cubeobj.obj");
+    Shader shader("C:/Users/solaryan/Desktop/CG/raytracing\\src\\shaders\\vertexshader.vert", "C:/Users/solaryan/Desktop/CG/raytracing\\src\\shaders\\pathtracing.frag");
+    Scene Xmodel("C:\\Users\\solaryan\\Desktop\\CG\\raytracing\\assets\\2cubes\\test0.obj");
 
     std::cout << "------ Begin ------" << std::endl;
 

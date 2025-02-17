@@ -93,6 +93,23 @@ void Shader::setVec3(const std::string &name, const glm::vec3 &vec) const {
     
 }
 
+template<typename T>
+void Shader::setArray(const std::string &name, const T *data, int count) const {
+    GLint location = glGetUniformLocation(ID, name.c_str());
+    if constexpr (std::is_same<T, float>::value) {
+        glUniform1fv(location, count, data);
+    } else if constexpr (std::is_same<T, glm::vec2>::value) {
+        glUniform2fv(location, count, glm::value_ptr(data[0]));
+    } else if constexpr (std::is_same<T, glm::vec3>::value) {
+        glUniform3fv(location, count, glm::value_ptr(data[0]));
+    } else if constexpr (std::is_same<T, glm::vec4>::value) {
+        glUniform4fv(location, count, glm::value_ptr(data[0]));
+    } else {
+        // TODO: error
+        return;
+    }
+}
+
 void Shader::del() {
     glDeleteProgram(ID);
 }

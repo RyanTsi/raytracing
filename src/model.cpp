@@ -1,16 +1,36 @@
 #include "model.h"
 
-Mesh::Mesh(std::vector<Vertex> _vertices, std::vector<unsigned int> _indices, std::vector<Texture> _textures) {
+Light::Light(vec3 _center, float _width, float _length, vec3 _norm, vec3 _color, float _power) {
+    center = _center;
+    width  = _width;
+    length = _length;
+    norm   = _norm;
+    color  = _color;
+    power  = _power;
+}
+
+void Light::set(unsigned int id, Shader &shader) {
+    std::string pre = "light[" + std::to_string(id) + "]";
+    shader.setVec3(pre+".center", center);
+    shader.setFloat(pre+".width", width);
+    shader.setFloat(pre+".length", length);
+    shader.setVec3(pre+".norm", norm);
+    shader.setVec3(pre+".color", color);
+    shader.setFloat(pre+".power", power);
+}
+
+Light::~Light() {}
+
+Mesh::Mesh(std::vector<Vertex> _vertices, std::vector<unsigned int> _indices, const Material *_material) {
     this->vertices = _vertices;
     this->indices  = _indices;
-    this->textures = _textures;
+    this->material = _material;
     setupMesh();
 }
 
 Mesh::~Mesh() {}
 
 void Mesh::setupMesh() {
-    
     glGenVertexArrays(1, &VAO);
     glGenBuffers(1, &VBO);
     glGenBuffers(1, &EBO);
@@ -35,31 +55,13 @@ void Mesh::setupMesh() {
 }
 
 void Mesh::draw(Shader &shader)  {
-    // bind appropriate textures
-    unsigned int diffuseNr  = 1;
-    unsigned int specularNr = 1;
-    unsigned int normalNr   = 1;
-    unsigned int heightNr   = 1;
-    for(unsigned int i = 0; i < textures.size(); i++) {
-        glActiveTexture(GL_TEXTURE0 + i); // active proper texture unit before binding
-        // retrieve texture number (the N in diffuse_textureN)
-        std::string number;
-        std::string name = textures[i].type;
-        if(name == "texture_diffuse")
-            number = std::to_string(diffuseNr++);
-        else if(name == "texture_specular")
-            number = std::to_string(specularNr++); // transfer unsigned int to string
-        else if(name == "texture_normal")
-            number = std::to_string(normalNr++); // transfer unsigned int to string
-        else if(name == "texture_height")
-            number = std::to_string(heightNr++); // transfer unsigned int to string
-
-        // now set the sampler to the correct texture unit
-        glUniform1i(glGetUniformLocation(shader.ID, (name + number).c_str()), i);
-        // and finally bind the texture
-        glBindTexture(GL_TEXTURE_2D, textures[i].id);
-    }
-    
+    shader.setVec3("material.ambient",  material->ambient);
+    shader.setVec3("material.diffuse",  material->diffuse);
+    shader.setVec3("material.specular", material->specular);
+    shader.setVec3("material.emissive", material->emissive);
+    shader.setFloat("material.shininess", material->shininess);
+    shader.setFloat("material.reflact", material->reflact);
+    shader.setFloat("material.opacity", material->opacity);
     // draw mesh
     glBindVertexArray(VAO);
     glDrawElements(GL_TRIANGLES, static_cast<unsigned int>(indices.size()), GL_UNSIGNED_INT, 0);
@@ -69,11 +71,11 @@ void Mesh::draw(Shader &shader)  {
     glActiveTexture(GL_TEXTURE0);
 }
 
-Model::Model(const char *path) {
-    loadModel(path);
+Scene::Scene(const char *path) {
+    loadScene(path);
 }
 
-void Model::loadModel(std::string path) {
+void Scene::loadScene(std::string path) {
     Assimp::Importer importer;
     const aiScene* scene = importer.ReadFile(path,
         aiProcess_CalcTangentSpace       |
@@ -83,12 +85,17 @@ void Model::loadModel(std::string path) {
         std::cout << "ERROR::ASSIMP::" << importer.GetErrorString() << std::endl;
         return;
     }
+    // std::map<unsigned int, unsigned int> mp;
+    for(unsigned int i = 0; i < scene->mNumMaterials; i ++) {
+        const aiMaterial *material = scene->mMaterials[i];
+        materials.push_back(Material(material));
+    }
     directory = path.substr(0, path.find_last_of('/'));
 
     processNode(scene->mRootNode, scene);
 }
 
-void Model::processNode(aiNode *node, const aiScene *scene) {
+void Scene::processNode(aiNode *node, const aiScene *scene) {
     for(int i = 0; i < node->mNumMeshes; i ++) {
         aiMesh *mesh = scene->mMeshes[node->mMeshes[i]];
         meshes.push_back(processMesh(mesh, scene));
@@ -98,10 +105,10 @@ void Model::processNode(aiNode *node, const aiScene *scene) {
     }
 }
 
-Mesh Model::processMesh(aiMesh *mesh, const aiScene *scene) {
+Mesh Scene::processMesh(aiMesh *mesh, const aiScene *scene) {
     std::vector<Vertex> vertices;
     std::vector<unsigned int> indices;
-    std::vector<Texture> textures;
+    Material *material;
     for(int i = 0; i < mesh->mNumVertices; i ++) {
         Vertex vertex(
             vec3(mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z),
@@ -120,32 +127,11 @@ Mesh Model::processMesh(aiMesh *mesh, const aiScene *scene) {
             indices.push_back(face.mIndices[j]);
         }
     }
-
-    // 加工材料
-    aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
-    // 我们假设着色器中的采样器名称约定。 每个漫反射纹理应命名为'texture_diffuseN'，其中N是从1到MAX_SAMPLER_NUMBER的序列号。
-    // 同样适用于其他纹理，如下列总结：
-    // diffuse: texture_diffuseN
-    // specular: texture_specularN
-    // normal: texture_normalN
-
-    // 1. 漫反射贴图
-    std::vector<Texture> diffuseMaps = loadMaterialTextures(material, aiTextureType_DIFFUSE, "texture_diffuse");
-    textures.insert(textures.end(), diffuseMaps.begin(), diffuseMaps.end());
-    // 2. 高光贴图
-    std::vector<Texture> specularMaps = loadMaterialTextures(material, aiTextureType_SPECULAR, "texture_specular");
-    textures.insert(textures.end(), specularMaps.begin(), specularMaps.end());
-    // 3.法线贴图
-    std::vector<Texture> normalMaps = loadMaterialTextures(material, aiTextureType_HEIGHT, "texture_normal");
-    textures.insert(textures.end(), normalMaps.begin(), normalMaps.end());
-    // 4. 高度贴图
-    std::vector<Texture> heightMaps = loadMaterialTextures(material, aiTextureType_AMBIENT, "texture_height");
-    textures.insert(textures.end(), heightMaps.begin(), heightMaps.end());
-
-    return Mesh(vertices, indices, textures);
+    material = &materials[mesh->mMaterialIndex];
+    return Mesh(vertices, indices, material);
 }
 
-std::vector<Texture> Model::loadMaterialTextures(aiMaterial *mat, aiTextureType type, std::string typeName) {
+std::vector<Texture> Scene::loadMaterialTextures(aiMaterial *mat, aiTextureType type, std::string typeName) {
     std::vector<Texture> textures;
     for(unsigned int i = 0; i < mat->GetTextureCount(type); i++) {
         aiString str;
@@ -170,14 +156,17 @@ std::vector<Texture> Model::loadMaterialTextures(aiMaterial *mat, aiTextureType 
     return textures;
 }
 
-void Model::draw(Shader &shader) {
+void Scene::draw(Shader &shader) {
     for(int i = 0; i < meshes.size(); i ++) {
         meshes[i].draw(shader);
     }
 }
 
+void Scene::addLight(Light light) {
+    lights.push_back(light);
+}
 
-Model::~Model() {}
+Scene::~Scene() {}
 
 unsigned int TextureFromFile(const char *path, const std::string &directory) {
     std::string filename = std::string(path);
@@ -214,3 +203,4 @@ unsigned int TextureFromFile(const char *path, const std::string &directory) {
 
     return textureID;
 }
+

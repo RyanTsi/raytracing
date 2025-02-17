@@ -9,6 +9,7 @@
 #include "shaderManager.h"
 #include <iostream>
 #include <stb_image.h>
+#include "material.h"
 
 using glm::vec3;
 using glm::vec2;
@@ -30,6 +31,20 @@ struct Texture {
     std::string path;
 };
 
+class Light {
+public:
+    Light(vec3 _center, float _width, float _length, vec3 _norm, vec3 _color, float _power);
+    void set(unsigned int id, Shader &shader);
+    ~Light();
+private:
+    vec3 center;
+    float width;
+    float length;
+    vec3 norm;
+    vec3 color;
+    float power;
+};
+
 class Mesh {
 private:
     unsigned int VAO, VBO, EBO;
@@ -37,26 +52,31 @@ private:
 public:
     std::vector<Vertex> vertices;
     std::vector<unsigned int> indices;
-    std::vector<Texture> textures;
-
-    Mesh(std::vector<Vertex> _vertices, std::vector<unsigned int> _indices, std::vector<Texture> _textures);
+    // TODO: Texture
+    // std::vector<Texture> textures;
+    const Material *material;
+    Mesh(std::vector<Vertex> _vertices, std::vector<unsigned int> _indices, const Material *_material);
     void draw(Shader &shader);
     ~Mesh();
 };
 
-class Model {
+class Scene {
 public:
-    Model(const char *path);
-    ~Model();
-    void draw(Shader &shader);   
+    Scene(const char *path);
+    ~Scene();
+    void draw(Shader &shader);
     std::vector<Mesh> meshes;
+    std::vector<Material> materials;
+    std::vector<Light> lights;
+    void addLight(Light light);
 private:
     std::string directory;
     std::vector<Texture> textures_loaded;
-    void loadModel(std::string path);
+    void loadScene(std::string path);
     void processNode(aiNode *node, const aiScene *scene);
     Mesh processMesh(aiMesh *mesh, const aiScene *scene);
     std::vector<Texture> loadMaterialTextures(aiMaterial *mat, aiTextureType type, std::string typeName);
 };
 
 unsigned int TextureFromFile(const char *path, const std::string &directory);
+
