@@ -58,7 +58,7 @@ int main() {
     double last_time = glfwGetTime(), detaTime;
 	double fps = 60, counter_time = 0, counter_frame = 0;
 
-    // render loop
+    // ---------- render loop ----------
     while (!glfwWindowShouldClose(window)) {
         
         // ------ record ------
@@ -79,12 +79,12 @@ int main() {
         shader.use();
 
         // -- add --
-        shader.setMat4("project", camera.getProjectionMatrix());
-        shader.setMat4("view", camera.getViewMatrix());
-        glm::mat4 model(1.0f);
-        shader.setMat4("model", model);
-        shader.setVec3("lightPos", lightPos);
-        shader.setVec3("lightColor", lightColor);
+        // shader.setMat4("project", camera.getProjectionMatrix());
+        // shader.setMat4("view", camera.getViewMatrix());
+        // glm::mat4 model(1.0f);
+        // shader.setMat4("model", model);
+        // shader.setVec3("lightPos", lightPos);
+        // shader.setVec3("lightColor", lightColor);
         // -- end --
         
         Xmodel.draw(shader);

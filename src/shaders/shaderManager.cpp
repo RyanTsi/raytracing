@@ -90,7 +90,10 @@ void Shader::setMat4(const std::string &name, const glm::mat4 &mat) const {
 
 void Shader::setVec3(const std::string &name, const glm::vec3 &vec) const {
     glUniform3fv(glGetUniformLocation(ID, name.c_str()), 1, glm::value_ptr(vec));
-    
+}
+
+void Shader::setVec2(const std::string &name, const glm::vec2 &vec) const {
+    glUniform2fv(glGetUniformLocation(ID, name.c_str()), 1, glm::value_ptr(vec));
 }
 
 template<typename T>
@@ -112,4 +115,27 @@ void Shader::setArray(const std::string &name, const T *data, int count) const {
 
 void Shader::del() {
     glDeleteProgram(ID);
+}
+
+void Shader::addSSBO(const std::string &name, const void *data, size_t size, GLuint binding) {
+    ssbos.emplace_back(SSBO(name, ID, size, binding));
+    ssbos.back().bindData(data);
+}
+
+SSBO::SSBO(const std::string& ssboName, GLuint programID, size_t size, GLuint binding) 
+    : name(ssboName), bufferSize(size), ssboID(0), bindingPoint(binding) {
+    glGenBuffers(1, &ssboID);
+}
+
+SSBO::~SSBO() {
+    if (ssboID != 0) {
+        glDeleteBuffers(1, &ssboID);
+    }
+}
+
+void SSBO::bindData(const void* data) const {
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssboID);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, bufferSize, data, GL_DYNAMIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, bindingPoint, ssboID);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }

@@ -8,12 +8,28 @@
 #include <iostream>
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <map>
+#include <vector>
+
+
+class SSBO {
+private:
+    GLuint ssboID;
+    size_t bufferSize;
+    GLuint bindingPoint;
+    std::string name;
+public:
+    SSBO(const std::string& ssboName, GLuint programID, size_t size, GLuint binding);
+    ~SSBO();
+    void bindData(const void* data) const;
+};
 
 class Shader {
 private:
-public:
     // 程序ID
-    unsigned int ID;
+    GLuint ID;
+    std::vector<SSBO> ssbos;
+public:
     // 构造器读取并构建着色器
     Shader(const char* vertexPath, const char* fragmentPath);
     void use();
@@ -23,7 +39,11 @@ public:
     void setFloat(const std::string &name, float value) const;
     void setMat4(const std::string &name, const glm::mat4 &mat) const;
     void setVec3(const std::string &name, const glm::vec3 &vec) const;
+    void setVec2(const std::string &name, const glm::vec2 &vec) const;
     template<typename T>
     void setArray(const std::string &name, const T *data, int count) const;
+    void addSSBO(const std::string &name , const void *data, size_t size, GLuint binding);
     void del();
 };
+
+

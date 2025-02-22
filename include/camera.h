@@ -11,14 +11,14 @@ using glm::mat3;
 
 class Camera {
 private:
+    float zNear;
+    float zFar;
+public:
     vec3 position;
     vec3 front;
     vec3 upDirection;
     float eyeFov;
     float aspectRatio;
-    float zNear;
-    float zFar;
-public:
     Camera();
     Camera(float x, float y, float z);
     float speed;

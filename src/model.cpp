@@ -9,16 +9,6 @@ Light::Light(vec3 _center, float _width, float _length, vec3 _norm, vec3 _color,
     power  = _power;
 }
 
-void Light::set(unsigned int id, Shader &shader) {
-    std::string pre = "light[" + std::to_string(id) + "]";
-    shader.setVec3(pre+".center", center);
-    shader.setFloat(pre+".width", width);
-    shader.setFloat(pre+".length", length);
-    shader.setVec3(pre+".norm", norm);
-    shader.setVec3(pre+".color", color);
-    shader.setFloat(pre+".power", power);
-}
-
 Light::~Light() {}
 
 Mesh::Mesh(std::vector<Vertex> _vertices, std::vector<unsigned int> _indices, const Material *_material) {
@@ -72,7 +62,58 @@ void Mesh::draw(Shader &shader)  {
 }
 
 Scene::Scene(const char *path) {
+    isInit = false;
     loadScene(path);
+    for(auto mesh : meshes) {
+        for(unsigned int i = 0; i < mesh.indices.size(); i += 3) {
+            trianglesBuffer.push_back(
+                Triangle(mesh.vertices[mesh.indices[i]], 
+                         mesh.vertices[mesh.indices[i + 1]], 
+                         mesh.vertices[mesh.indices[i + 2]],
+                         mesh.material - &materials[0]
+                ));
+        }
+    }
+    setFrame();
+    setCamera();
+}
+
+void Scene::setCamera() {
+    camera = Camera();
+}
+
+void Scene::setInShaderD(Shader &shader) {
+    shader.setVec3("uCamera.position", camera.position);
+    shader.setVec3("uCamera.front", camera.front);
+    shader.setVec3("uCamera.up", camera.upDirection);
+    shader.setFloat("uCamera.fov", camera.eyeFov);
+    shader.setFloat("uCamera.aspectRatio", camera.aspectRatio);
+}
+
+void Scene::setInShaderS(Shader &shader) {
+    shader.setInt("SCREEN_WIDTH", SCREEN_WIDTH);
+    shader.setInt("SCREEN_HEIGHT", SCREEN_HEIGHT);
+    shader.addSSBO("lightBuffer", &lights[0], lights.size() * sizeof(Light), 0);
+}
+
+void Scene::setFrame() {
+    float quad[12] = {
+        -1.0f, -1.0f,
+        -1.0f,  1.0f,
+         1.0f, -1.0f,
+         1.0f,  1.0f,
+        -1.0f,  1.0f,
+         1.0f, -1.0f,
+    };
+    glGenVertexArrays(1, &VAO);
+    glGenBuffers(1, &VBO);
+    glBindVertexArray(VAO);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferData(GL_ARRAY_BUFFER, 12 * sizeof(float), quad, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+    glBindVertexArray(0);
+
 }
 
 void Scene::loadScene(std::string path) {
@@ -96,11 +137,11 @@ void Scene::loadScene(std::string path) {
 }
 
 void Scene::processNode(aiNode *node, const aiScene *scene) {
-    for(int i = 0; i < node->mNumMeshes; i ++) {
+    for(unsigned int i = 0; i < node->mNumMeshes; i ++) {
         aiMesh *mesh = scene->mMeshes[node->mMeshes[i]];
         meshes.push_back(processMesh(mesh, scene));
     }
-    for(int i = 0; i < node->mNumChildren; i ++) {
+    for(unsigned int i = 0; i < node->mNumChildren; i ++) {
         processNode(node->mChildren[i], scene);
     }
 }
@@ -157,9 +198,13 @@ std::vector<Texture> Scene::loadMaterialTextures(aiMaterial *mat, aiTextureType 
 }
 
 void Scene::draw(Shader &shader) {
-    for(int i = 0; i < meshes.size(); i ++) {
-        meshes[i].draw(shader);
-    }
+    if(!isInit) setInShaderS(shader);
+    setInShaderD(shader);
+    // for(int i = 0; i < meshes.size(); i ++) {
+    //     meshes[i].draw(shader);
+    // }
+    glBindVertexArray(VAO);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
 }
 
 void Scene::addLight(Light light) {
@@ -204,3 +249,7 @@ unsigned int TextureFromFile(const char *path, const std::string &directory) {
     return textureID;
 }
 
+void initShaer(Shader &shader) {
+    shader.setInt("SCREEN_WIDTH", SCREEN_WIDTH);
+    shader.setInt("SCREEN_WIDTH", SCREEN_HEIGHT);
+}
