@@ -1,6 +1,6 @@
 #include "model.h"
 
-Light::Light(vec3 _center, float _width, float _length, vec3 _norm, vec3 _color, float _power) {
+Light::Light(vec4 _center, float _width, float _length, vec4 _norm, vec4 _color, float _power) {
     center = _center;
     width  = _width;
     length = _length;
@@ -64,22 +64,26 @@ void Mesh::draw(Shader &shader)  {
 Scene::Scene(const char *path) {
     isInit = false;
     loadScene(path);
+    setFrame();
+    setCamera();
+    setMesh();
+}
+
+void Scene::setCamera() {
+    camera = Camera(0, 0, 10);
+}
+
+void Scene::setMesh() {
     for(auto mesh : meshes) {
         for(unsigned int i = 0; i < mesh.indices.size(); i += 3) {
             trianglesBuffer.push_back(
-                Triangle(mesh.vertices[mesh.indices[i]], 
+                TriangleData(mesh.vertices[mesh.indices[i]], 
                          mesh.vertices[mesh.indices[i + 1]], 
                          mesh.vertices[mesh.indices[i + 2]],
                          mesh.material - &materials[0]
                 ));
         }
     }
-    setFrame();
-    setCamera();
-}
-
-void Scene::setCamera() {
-    camera = Camera();
 }
 
 void Scene::setInShaderD(Shader &shader) {
@@ -93,7 +97,9 @@ void Scene::setInShaderD(Shader &shader) {
 void Scene::setInShaderS(Shader &shader) {
     shader.setInt("SCREEN_WIDTH", SCREEN_WIDTH);
     shader.setInt("SCREEN_HEIGHT", SCREEN_HEIGHT);
-    shader.addSSBO("lightBuffer", &lights[0], lights.size() * sizeof(Light), 0);
+    shader.addSSBO("triangleBuffer", trianglesBuffer.data(), trianglesBuffer.size() * sizeof(TriangleData), 3);
+    shader.addSSBO("lightBuffer", lights.data(), lights.size() * sizeof(Light), 1);    
+    shader.addSSBO("materialBuffer", materials.data(), materials.size() * sizeof(Material), 2);
 }
 
 void Scene::setFrame() {
@@ -152,8 +158,8 @@ Mesh Scene::processMesh(aiMesh *mesh, const aiScene *scene) {
     Material *material;
     for(int i = 0; i < mesh->mNumVertices; i ++) {
         Vertex vertex(
-            vec3(mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z),
-            vec3(mesh->mNormals[i].x , mesh->mNormals[i].y , mesh->mNormals[i].z),
+            vec4(mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z, 0),
+            vec4(mesh->mNormals[i].x , mesh->mNormals[i].y , mesh->mNormals[i].z,  0),
             vec2(0.0f)
         );
         // TODO: uv coords 0-8 ?
@@ -198,7 +204,7 @@ std::vector<Texture> Scene::loadMaterialTextures(aiMaterial *mat, aiTextureType 
 }
 
 void Scene::draw(Shader &shader) {
-    if(!isInit) setInShaderS(shader);
+    if(!isInit) setInShaderS(shader), isInit = true;
     setInShaderD(shader);
     // for(int i = 0; i < meshes.size(); i ++) {
     //     meshes[i].draw(shader);
@@ -251,5 +257,5 @@ unsigned int TextureFromFile(const char *path, const std::string &directory) {
 
 void initShaer(Shader &shader) {
     shader.setInt("SCREEN_WIDTH", SCREEN_WIDTH);
-    shader.setInt("SCREEN_WIDTH", SCREEN_HEIGHT);
+    shader.setInt("SCREEN_HEIGHT", SCREEN_HEIGHT);
 }

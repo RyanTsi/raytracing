@@ -5,21 +5,19 @@ out vec4 FragColor;
 
 struct Material {
     float shininess;
-    vec3  ambient;
-    vec3  diffuse;
-    vec3  specular;
-    vec3  emissive;
+    vec4  ambient;
+    vec4  diffuse;
+    vec4  specular;
+    vec4  emissive;
     float reflact;
     float opacity;
 }; 
 
 struct Light {
-    vec3 center;
-    float wid;
-    float len;
-    vec3 norm;
-    vec3 color;
-    float power;
+    vec4 center;
+    vec4 w_l_p_t; // width-length-power-type
+    vec4 norm;
+    vec4 color;
 };
 
 
@@ -30,20 +28,40 @@ struct Vertex {
 };
 
 struct Triangle {
-    Vertex vertex[3];
+    Vertex vert[3];
+};
+
+
+struct TriangleData {
+    float position[9];
+    float normal[9];
+    float uv[6];
     uint materialIdx;
 };
 
-layout(binding = 0, std430) readonly buffer lightBuffer {
+layout(std430, binding = 1) buffer lightBuffer {
     Light lights[];
 };
 
-layout(binding = 1, std430) readonly buffer materialBuffer {
+layout(std430, binding = 2) buffer materialBuffer {
     Material materials[];
 };
 
-layout(binding = 2, std430) readonly buffer triangleBuffer {
-    Triangle triangles[];
+layout(std430, binding = 3) buffer triangleBuffer {
+    TriangleData triangles_Data[];
+};
+
+Triangle formTriangleData(uint idx) {
+    TriangleData data = triangles_Data[idx];
+    Triangle triangle;
+    for(uint i = 0; i < 3; i ++) {
+        triangle.vert[i].position = vec3(data.position[i * 3 + 0], data.position[i * 3 + 1], data.position[i * 3 + 2]);
+        triangle.vert[i].normal = vec3(data.normal[i * 3 + 0], data.normal[i * 3 + 1], data.normal[i * 3 + 2]);
+        if(i < 2) {
+            triangle.vert[i].texCoords = vec2(data.uv[i * 3 + 0], data.uv[i * 3 + 1]);
+        }
+    }
+    return triangle;
 };
 
 struct Ray {
@@ -74,10 +92,38 @@ void calFirstRay() {
     );
 }
 
+bool intersectTriangle(Ray ray, vec3 a, vec3 b, vec3 c, out float k) {
+    const float EPSILON = 0.0000001;
+    vec3 e1 = b - a, e2 = c - a;
+    vec3 h = cross(ray.dir, e2);
+    float det = dot(e1, h);
+    if(det > -EPSILON && det < EPSILON) {
+        return false;
+    }
+    vec3 s = ray.ori - a;
+    float u = dot(s, h) / det;
+    vec3 q = cross(s, e1);
+    float v = dot(ray.dir, q) / det;
+    if(u < 0 || v < 0 || u + v > 1) {
+        return false;
+    }
+    k = dot(e2, q) / det;
+    if(k > EPSILON) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
 void main() {
     calFirstRay();
-    // gl_FragCoord.xy;
-    // FragColor = vec4(material.diffuse, 1);
-    FragColor = vec4(ray.dir, 1);
-    // FragColor = vec4(1, 1, 0, 1);
+    float k;
+    for(uint i = 0; i < triangles_Data.length(); i ++) {
+        Triangle triangle = formTriangleData(i);
+        if(intersectTriangle(ray, triangle.vert[0].position, triangle.vert[1].position, triangle.vert[2].position, k)) {
+            FragColor = vec4(0.5, 0.5, 1, 1);
+        } else {
+            FragColor = vec4(1, 1, 1, 1);
+        }
+    }
 }

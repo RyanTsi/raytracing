@@ -72,6 +72,10 @@ void Shader::use() {
     glUseProgram(ID);
 }
 
+void Shader::release() {
+    glUseProgram(0);
+}
+
 void Shader::setBool(const std::string &name, bool value) const {
     glUniform1i(glGetUniformLocation(ID, name.c_str()), (int)value); 
 }
@@ -118,14 +122,18 @@ void Shader::del() {
 }
 
 void Shader::addSSBO(const std::string &name, const void *data, size_t size, GLuint binding) {
-    ssbos.emplace_back(SSBO(name, ID, size, binding));
-    ssbos.back().bindData(data);
+    if(size == 0) return;
+    SSBOs[name] = SSBO(name, ID, size, binding);
+    SSBOs[name].bindData(data);
 }
 
 SSBO::SSBO(const std::string& ssboName, GLuint programID, size_t size, GLuint binding) 
     : name(ssboName), bufferSize(size), ssboID(0), bindingPoint(binding) {
     glGenBuffers(1, &ssboID);
+    // std::cout << ssboID << std::endl;
 }
+
+SSBO::SSBO() {}
 
 SSBO::~SSBO() {
     if (ssboID != 0) {

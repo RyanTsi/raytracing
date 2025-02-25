@@ -17,14 +17,11 @@ using glm::vec3;
 using glm::vec2;
 
 struct Vertex {
-    vec3 position;
-    vec3 normal;
+    vec4 position;
+    vec4 normal;
     vec2 texCoords;
-    Vertex(vec3 _position, vec3 _normal, vec2 _texCoords) {
-        position  = _position;
-        normal    = _normal;
-        texCoords = _texCoords;
-    }
+    Vertex(glm::vec4 _position, glm::vec4 _normal, glm::vec2 _texCoords)
+        : position(_position), normal(_normal), texCoords(_texCoords) {}
     Vertex() {};
 };
 
@@ -36,14 +33,14 @@ struct Texture {
 
 class Light {
 public:
-    Light(vec3 _center, float _width, float _length, vec3 _norm, vec3 _color, float _power);
+    Light(vec4 _center, float _width, float _length, vec4 _norm, vec4 _color, float _power);
     ~Light();
 private:
-    vec3 center;
+    vec4 center;
     float width;
     float length;
-    vec3 norm;
-    vec3 color;
+    vec4 norm;
+    vec4 color;
     float power;
 };
 
@@ -62,34 +59,51 @@ public:
     ~Mesh();
 };
 
-struct Triangle {
-    Vertex vertex[3];
+struct TriangleData {
+    float position[9];
+    float normal[9];
+    float uv[6];
     GLuint materialIdx;
-    Triangle(Vertex a, Vertex b, Vertex c, GLuint idx) {
-        vertex[0] = a, vertex[1] = b, vertex[2] = c;
-        materialIdx = idx;
+    TriangleData() {}
+    TriangleData(Vertex &a, Vertex &b, Vertex &c, GLuint matIdx = 0) 
+        : materialIdx(matIdx) {
+        for (int i = 0; i < 3; i ++) {
+            position[i * 3 + 0] = a.position[i];
+            position[i * 3 + 1] = b.position[i];
+            position[i * 3 + 2] = c.position[i];
+
+            normal[i * 3 + 0] = a.normal[i];
+            normal[i * 3 + 1] = b.normal[i];
+            normal[i * 3 + 2] = c.normal[i];
+
+            if (i < 2) { // texCoords 只有 2 维
+                uv[i * 3 + 0] = a.texCoords[i];
+                uv[i * 3 + 1] = b.texCoords[i];
+                uv[i * 3 + 2] = c.texCoords[i];
+            }
+        }
     }
 };
 
 class Scene {
 public:
     Scene(const char *path);
-    void setFrame();
-    void setMeshs();
     void draw(Shader &shader);
     void setInShaderD(Shader &shader);
     void setInShaderS(Shader &shader);
     std::vector<Mesh> meshes;
     std::vector<Material> materials;
     std::vector<Light> lights;
-    std::vector<Triangle> trianglesBuffer;
+    std::vector<TriangleData> trianglesBuffer;
     Camera camera;
     void addLight(Light light);
     ~Scene();
 private:
     unsigned int VAO, VBO, EBO;
     bool isInit;
+    void setFrame();
     void setCamera();
+    void setMesh();
     std::string directory;
     std::vector<Texture> textures_loaded;
     void loadScene(std::string path);

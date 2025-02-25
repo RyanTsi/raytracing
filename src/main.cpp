@@ -12,9 +12,6 @@
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
 
-glm::vec3 lightPos(10, 10, -20), lightColor(1.0f, 1.0f, 1.0f);
-
-Camera camera(0, 0, 10);
 int moveState[4];
 glm::vec3 moveArrow;
 
@@ -25,9 +22,9 @@ int main() {
         return -1;
     }
 
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    // glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+    // glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
+    // glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
     // create a window
     GLFWwindow* window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Renderer", NULL, NULL);
@@ -37,21 +34,20 @@ int main() {
         return -1;
     } 
     glfwMakeContextCurrent(window);
-
     // load glad
     int version = gladLoadGL(glfwGetProcAddress);
     printf("GL %d.%d\n", GLAD_VERSION_MAJOR(version), GLAD_VERSION_MINOR(version));
 
     // set init state and callback function
     glViewport(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
-    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
-    glfwSetKeyCallback(window, key_callback);
+    // glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+    // glfwSetKeyCallback(window, key_callback);
 
-    glEnable(GL_DEPTH_TEST);
+    // glEnable(GL_DEPTH_TEST);
 
     // my shader
-    Shader shader("C:/Users/solaryan/Desktop/CG/raytracing\\src\\shaders\\vertexshader.vert", "C:/Users/solaryan/Desktop/CG/raytracing\\src\\shaders\\pathtracing.frag");
-    Scene Xmodel("C:\\Users\\solaryan\\Desktop\\CG\\raytracing\\assets\\2cubes\\test0.obj");
+    Shader shader("C:/Users/solaryan/Desktop/CG/raytracing/src/shaders/vertexshader.vert", "C:/Users/solaryan/Desktop/CG/raytracing/src/shaders/pathtracing.frag");
+    Scene Xmodel("C:/Users/solaryan/Desktop/CG/raytracing/assets/2cubes/test0.obj");
 
     std::cout << "------ Begin ------" << std::endl;
 
@@ -74,7 +70,6 @@ int main() {
 
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // also clear the depth buffer now!
-
         // 使用着色器程序，使用后才能 set
         shader.use();
 
@@ -108,22 +103,22 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
     moveArrow.z = 1.0f * moveState[0] - moveState[1];
     moveArrow.x = 1.0f * moveState[2] - moveState[3];
     // std::cout << moveArrow.x << " " << moveArrow.y << " " << moveArrow.z << std::endl;
-    camera.move(moveArrow);
-    if (key == GLFW_KEY_Q && action == GLFW_REPEAT) {
-        camera.yaw(camera.angularVelocity);
-    } 
-    if (key == GLFW_KEY_E && action == GLFW_REPEAT) {
-        camera.yaw(-camera.angularVelocity);
-    }
-    if (key == GLFW_KEY_SPACE && action == GLFW_REPEAT) {
-        camera.up();
-    }
-    if (key == GLFW_KEY_SPACE && mods == GLFW_MOD_SHIFT) {
-        camera.down();
-    }
-    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
-        glfwSetWindowShouldClose(window, GL_TRUE);
-    }
+    // camera.move(moveArrow);
+    // if (key == GLFW_KEY_Q && action == GLFW_REPEAT) {
+    //     camera.yaw(camera.angularVelocity);
+    // } 
+    // if (key == GLFW_KEY_E && action == GLFW_REPEAT) {
+    //     camera.yaw(-camera.angularVelocity);
+    // }
+    // if (key == GLFW_KEY_SPACE && action == GLFW_REPEAT) {
+    //     camera.up();
+    // }
+    // if (key == GLFW_KEY_SPACE && mods == GLFW_MOD_SHIFT) {
+    //     camera.down();
+    // }
+    // if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
+    //     glfwSetWindowShouldClose(window, GL_TRUE);
+    // }
 }
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height) {

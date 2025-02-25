@@ -8,8 +8,8 @@
 #include <iostream>
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
-#include <map>
-#include <vector>
+#include <unordered_map>
+#include <string>
 
 
 class SSBO {
@@ -20,6 +20,7 @@ private:
     std::string name;
 public:
     SSBO(const std::string& ssboName, GLuint programID, size_t size, GLuint binding);
+    SSBO();
     ~SSBO();
     void bindData(const void* data) const;
 };
@@ -28,11 +29,12 @@ class Shader {
 private:
     // 程序ID
     GLuint ID;
-    std::vector<SSBO> ssbos;
+    std::unordered_map<std::string, SSBO> SSBOs;
 public:
     // 构造器读取并构建着色器
     Shader(const char* vertexPath, const char* fragmentPath);
     void use();
+    void release();
     // uniform工具函数
     void setBool(const std::string &name, bool value) const;  
     void setInt(const std::string &name, int value) const;   
@@ -45,5 +47,4 @@ public:
     void addSSBO(const std::string &name , const void *data, size_t size, GLuint binding);
     void del();
 };
-
 

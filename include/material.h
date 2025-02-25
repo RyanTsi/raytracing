@@ -3,16 +3,17 @@
 #include <assimp/material.h>
 #include <iostream>
 
-using glm::vec3;
+using glm::vec4;
+
 class Material {
 public:
     Material(const aiMaterial* material);
     ~Material();
     float shininess;
-    vec3 ambient;
-    vec3 diffuse;
-    vec3 specular;
-    vec3 emissive;
+    vec4 ambient;
+    vec4 diffuse;
+    vec4 specular;
+    vec4 emissive;
     float reflact;
     float opacity;
 private:
