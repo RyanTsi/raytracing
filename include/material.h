@@ -5,15 +5,15 @@
 
 using glm::vec4;
 
-class Material {
+class alignas(16) Material {
 public:
     Material(const aiMaterial* material);
     ~Material();
-    float shininess;
     vec4 ambient;
     vec4 diffuse;
     vec4 specular;
     vec4 emissive;
+    float shininess;
     float reflact;
     float opacity;
 private:

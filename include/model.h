@@ -37,10 +37,10 @@ public:
     ~Light();
 private:
     vec4 center;
-    float width;
-    float length;
     vec4 norm;
     vec4 color;
+    float width;
+    float length;
     float power;
 };
 
@@ -68,18 +68,18 @@ struct TriangleData {
     TriangleData(Vertex &a, Vertex &b, Vertex &c, GLuint matIdx = 0) 
         : materialIdx(matIdx) {
         for (int i = 0; i < 3; i ++) {
-            position[i * 3 + 0] = a.position[i];
-            position[i * 3 + 1] = b.position[i];
-            position[i * 3 + 2] = c.position[i];
+            position[0 + i] = a.position[i];
+            position[3 + i] = b.position[i];
+            position[6 + i] = c.position[i];
 
-            normal[i * 3 + 0] = a.normal[i];
-            normal[i * 3 + 1] = b.normal[i];
-            normal[i * 3 + 2] = c.normal[i];
+            normal[0 + i] = a.normal[i];
+            normal[3 + i] = b.normal[i];
+            normal[6 + i] = c.normal[i];
 
             if (i < 2) { // texCoords 只有 2 维
-                uv[i * 3 + 0] = a.texCoords[i];
-                uv[i * 3 + 1] = b.texCoords[i];
-                uv[i * 3 + 2] = c.texCoords[i];
+                uv[0 + i] = a.texCoords[i];
+                uv[2 + i] = b.texCoords[i];
+                uv[4 + i] = c.texCoords[i];
             }
         }
     }

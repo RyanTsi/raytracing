@@ -77,8 +77,8 @@ void Scene::setMesh() {
     for(auto mesh : meshes) {
         for(unsigned int i = 0; i < mesh.indices.size(); i += 3) {
             trianglesBuffer.push_back(
-                TriangleData(mesh.vertices[mesh.indices[i]], 
-                         mesh.vertices[mesh.indices[i + 1]], 
+                TriangleData(mesh.vertices[mesh.indices[i]],
+                         mesh.vertices[mesh.indices[i + 1]],
                          mesh.vertices[mesh.indices[i + 2]],
                          mesh.material - &materials[0]
                 ));
@@ -104,12 +104,12 @@ void Scene::setInShaderS(Shader &shader) {
 
 void Scene::setFrame() {
     float quad[12] = {
-        -1.0f, -1.0f,
-        -1.0f,  1.0f,
-         1.0f, -1.0f,
-         1.0f,  1.0f,
-        -1.0f,  1.0f,
-         1.0f, -1.0f,
+        -1.0f,  1.0f, // 左上角
+        -1.0f, -1.0f, // 左下角
+         1.0f, -1.0f, // 右下角
+        -1.0f,  1.0f, // 左上角
+         1.0f, -1.0f, // 右下角
+         1.0f,  1.0f  // 右上角
     };
     glGenVertexArrays(1, &VAO);
     glGenBuffers(1, &VBO);

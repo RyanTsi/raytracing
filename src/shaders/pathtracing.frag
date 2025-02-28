@@ -1,25 +1,52 @@
 #version 460 core
 
+const float PI = 3.14159265358979323846;
 in vec2 screen_uv;
 out vec4 FragColor;
 
+struct Camera {
+    vec3 position;
+    vec3 front;
+    vec3 up;
+    float fov;
+    float aspectRatio;
+};
+uniform Camera uCamera;
+
+float rand(vec2 co) {
+    return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
+}
+
+float pow2(float a) {
+    return a * a;
+}
+
+vec3 randomInUnitSphere() {
+    vec3 p;
+    do {
+        p = 2.0 * vec3(rand(gl_FragCoord.xy), rand(gl_FragCoord.yx), rand(-gl_FragCoord.xy)) - vec3(1, 1, 1);
+    } while(dot(p, p) >= 1.0);
+    return p;
+}
+
 struct Material {
-    float shininess;
     vec4  ambient;
     vec4  diffuse;
     vec4  specular;
     vec4  emissive;
+    float shininess;
     float reflact;
     float opacity;
 }; 
 
 struct Light {
     vec4 center;
-    vec4 w_l_p_t; // width-length-power-type
     vec4 norm;
     vec4 color;
+    float wid;
+    float len;
+    float power;
 };
-
 
 struct Vertex {
     vec3 position;
@@ -29,8 +56,8 @@ struct Vertex {
 
 struct Triangle {
     Vertex vert[3];
+    uint materialIdx;
 };
-
 
 struct TriangleData {
     float position[9];
@@ -61,6 +88,7 @@ Triangle formTriangleData(uint idx) {
             triangle.vert[i].texCoords = vec2(data.uv[i * 3 + 0], data.uv[i * 3 + 1]);
         }
     }
+    triangle.materialIdx = data.materialIdx;
     return triangle;
 };
 
@@ -69,15 +97,77 @@ struct Ray {
     vec3 dir;
 } ray;
 
-struct Camera {
-    vec3 position;
-    vec3 front;
-    vec3 up;
-    float fov;
-    float aspectRatio;
-};
+struct HitRecord {
+    vec3 p;
+    vec3 normal;
+    float dis;
+    uint materialIdx;
+} hitrecord;
 
-uniform Camera uCamera;
+
+// Fresnel Schlick approximation
+vec3 fresnelSchlick(float cosTheta, vec3 F0) {
+    return F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0);
+}
+
+// GGX Normal Distribution Function
+float distributionGGX(vec3 N, vec3 H, float roughness) {
+    float a = pow2(roughness);
+    float a2 = pow2(a);
+    float NdotH = max(dot(N, H), 0.0);
+    float NdotH2 = pow2(NdotH);
+    float nom = a2;
+    float denom = (NdotH2 * (a2 - 1.0) + 1.0);
+    denom = PI * pow2(denom);
+
+    return nom / denom;
+}
+
+// Geometry Schlick GGX
+float geometrySchlickGGX(float NdotV, float roughness) {
+    float r = (roughness + 1.0);
+    float k = pow2(r) / 8.0;
+    float nom = NdotV;
+    float denom = NdotV * (1.0 - k) + k;
+    return nom / denom;
+}
+
+// Geometry Smith
+float geometrySmith(vec3 N, vec3 V, vec3 L, float roughness) {
+    float NdotV = max(dot(N, V), 0.0);
+    float NdotL = max(dot(N, L), 0.0);
+    float ggx2 = geometrySchlickGGX(NdotV, roughness);
+    float ggx1 = geometrySchlickGGX(NdotL, roughness);
+
+    return ggx1 * ggx2;
+}
+
+vec3 calBRDF(vec3 lightDir, vec3 viewDir, vec3 normal, Material material) {
+    vec3 halfVec = normalize(lightDir + viewDir);
+    float roughness = sqrt(2.0 / (material.shininess + 2.0));
+    vec3  F = fresnelSchlick(max(dot(halfVec, viewDir), 0), material.specular.xyz);
+    float D = distributionGGX(normal, halfVec, roughness);
+    float G = geometrySmith(normal, viewDir, lightDir, roughness);
+    // Specular BRDF
+    vec3 numerator = D * G * F;
+    float denominator = 4.0 * max(dot(normal, viewDir), 0.0) * max(dot(normal, lightDir), 0.0);
+    vec3 specular = numerator / max(denominator, 0.001);
+    
+    // Diffuse BRDF
+    vec3 kS = F;
+    vec3 kD = vec3(1.0) - kS;
+    kD *= 1.0;
+    
+    float NdotL = max(dot(normal, lightDir), 0.0);
+    vec3 diffuse = (kD * material.diffuse.xyz) / PI;
+    
+    // Combine diffuse and specular components
+    return (diffuse + specular) * NdotL;
+}
+
+const uint maxDeep = 10;
+
+
 
 void calFirstRay() {
     vec2 ndc_uv = screen_uv * 2 - vec2(1.0, 1.0);
@@ -92,7 +182,8 @@ void calFirstRay() {
     );
 }
 
-bool intersectTriangle(Ray ray, vec3 a, vec3 b, vec3 c, out float k) {
+bool intersectTriangle(Ray ray, Triangle triangle, out HitRecord hitrecord) {
+    vec3 a = triangle.vert[0].position, b = triangle.vert[1].position, c = triangle.vert[2].position;
     const float EPSILON = 0.0000001;
     vec3 e1 = b - a, e2 = c - a;
     vec3 h = cross(ray.dir, e2);
@@ -104,11 +195,17 @@ bool intersectTriangle(Ray ray, vec3 a, vec3 b, vec3 c, out float k) {
     float u = dot(s, h) / det;
     vec3 q = cross(s, e1);
     float v = dot(ray.dir, q) / det;
+    float w = 1 - u - v;
     if(u < 0 || v < 0 || u + v > 1) {
         return false;
     }
+    float k;
     k = dot(e2, q) / det;
     if(k > EPSILON) {
+        hitrecord.p = ray.ori + ray.dir * k;
+        hitrecord.normal = normalize(w * triangle.vert[0].normal + u * triangle.vert[1].normal + v * triangle.vert[2].normal);
+        hitrecord.dis = k;
+        hitrecord.materialIdx = triangle.materialIdx;
         return true;
     } else {
         return false;
@@ -117,13 +214,22 @@ bool intersectTriangle(Ray ray, vec3 a, vec3 b, vec3 c, out float k) {
 
 void main() {
     calFirstRay();
-    float k;
+    float minDis;
+    bool hit = false;
     for(uint i = 0; i < triangles_Data.length(); i ++) {
         Triangle triangle = formTriangleData(i);
-        if(intersectTriangle(ray, triangle.vert[0].position, triangle.vert[1].position, triangle.vert[2].position, k)) {
-            FragColor = vec4(0.5, 0.5, 1, 1);
-        } else {
-            FragColor = vec4(1, 1, 1, 1);
+        if(intersectTriangle(ray, triangle, hitrecord)) {
+            if(!hit || minDis > hitrecord.dis) {
+                hit = true;
+                minDis = hitrecord.dis;
+                FragColor = materials[triangle.materialIdx].diffuse;
+            }
+            // FragColor = vec4(0.5, 0.5, 1, 1);
         }
     }
+    if(!hit) {
+        FragColor = vec4(1, 1, 1, 1);
+    }
+
+    // FragColor = vec4(screen_uv, 0.0, 1.0);
 }
