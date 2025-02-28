@@ -1,6 +1,8 @@
 #version 460 core
 
 const float PI = 3.14159265358979323846;
+const float EPSILON = 0.0000001;
+
 in vec2 screen_uv;
 out vec4 FragColor;
 
@@ -41,10 +43,11 @@ struct Material {
 
 struct Light {
     vec4 center;
-    vec4 norm;
+    vec4 normal;
+    vec4 a_vec;
     vec4 color;
-    float wid;
-    float len;
+    float a_len;
+    float b_len;
     float power;
 };
 
@@ -102,6 +105,7 @@ struct HitRecord {
     vec3 normal;
     float dis;
     uint materialIdx;
+    bool isLight;
 } hitrecord;
 
 
@@ -167,8 +171,6 @@ vec3 calBRDF(vec3 lightDir, vec3 viewDir, vec3 normal, Material material) {
 
 const uint maxDeep = 10;
 
-
-
 void calFirstRay() {
     vec2 ndc_uv = screen_uv * 2 - vec2(1.0, 1.0);
     float ratio_y = tan(uCamera.fov / 2.0);
@@ -182,9 +184,8 @@ void calFirstRay() {
     );
 }
 
-bool intersectTriangle(Ray ray, Triangle triangle, out HitRecord hitrecord) {
+bool intersectTriangle(Ray ray, Triangle triangle, inout HitRecord hitrecord) {
     vec3 a = triangle.vert[0].position, b = triangle.vert[1].position, c = triangle.vert[2].position;
-    const float EPSILON = 0.0000001;
     vec3 e1 = b - a, e2 = c - a;
     vec3 h = cross(ray.dir, e2);
     float det = dot(e1, h);
@@ -201,34 +202,81 @@ bool intersectTriangle(Ray ray, Triangle triangle, out HitRecord hitrecord) {
     }
     float k;
     k = dot(e2, q) / det;
-    if(k > EPSILON) {
+    if(k > EPSILON && k < hitrecord.dis) {
         hitrecord.p = ray.ori + ray.dir * k;
         hitrecord.normal = normalize(w * triangle.vert[0].normal + u * triangle.vert[1].normal + v * triangle.vert[2].normal);
         hitrecord.dis = k;
         hitrecord.materialIdx = triangle.materialIdx;
+        hitrecord.isLight = false;
         return true;
     } else {
         return false;
     }
 }
 
+bool intersectLight(Ray ray, uint lightIdx, inout HitRecord hitrecord) {
+    Light light = lights[lightIdx];
+    vec3 u = light.a_vec.xyz, v = normalize(cross(light.a_vec.xyz, light.normal.xyz));
+    float det = dot(cross(ray.dir, u), v);
+    if(det > -EPSILON && det < EPSILON) {
+        return false;
+    }
+    float k = dot(light.normal.xyz, light.center.xyz - ray.ori) / dot(light.normal.xyz, ray.dir);
+    vec3 T = ray.ori + k * ray.dir - light.center.xyz;
+    if(k > EPSILON && k < hitrecord.dis && dot(T, u) < light.a_len && dot(T, v) < light.b_len) {
+        hitrecord.p = ray.ori + ray.dir * k;
+        hitrecord.normal = light.normal.xyz;
+        hitrecord.dis = k;
+        hitrecord.materialIdx = lightIdx;
+        hitrecord.isLight = true;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+vec3 trace(Ray ray, inout HitRecord hitrecord, uint dep) {
+    if(dep > maxDeep) return vec3(0);
+    bool hit = false;
+    hitrecord.dis = 1e12;
+    hitrecord.isLight = false;
+    vec3 res = vec3(1.0);
+    for(uint i = 0; i < triangles_Data.length(); i ++) {
+        if(intersectTriangle(ray, formTriangleData(i), hitrecord)) {
+            hit = true;
+        }
+    }
+    for(uint i = 0; i < lights.length(); i ++) {
+        if(intersectLight(ray, i, hitrecord)) {
+            hit = true;
+        }
+    }
+    if(hit) {
+        if(hitrecord.isLight == true) {
+            res = vec3(1.0);
+        } else {
+            
+        }
+    }
+    return res;
+}
+
 void main() {
+    hitrecord.dis = 1e12;
     calFirstRay();
     float minDis;
     bool hit = false;
     for(uint i = 0; i < triangles_Data.length(); i ++) {
         Triangle triangle = formTriangleData(i);
         if(intersectTriangle(ray, triangle, hitrecord)) {
-            if(!hit || minDis > hitrecord.dis) {
-                hit = true;
-                minDis = hitrecord.dis;
-                FragColor = materials[triangle.materialIdx].diffuse;
-            }
+            hit = true;
             // FragColor = vec4(0.5, 0.5, 1, 1);
         }
     }
     if(!hit) {
         FragColor = vec4(1, 1, 1, 1);
+    } else {
+        FragColor = materials[hitrecord.materialIdx].diffuse;
     }
 
     // FragColor = vec4(screen_uv, 0.0, 1.0);

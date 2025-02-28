@@ -1,9 +1,10 @@
 #include "model.h"
 
-Light::Light(vec4 _center, float _width, float _length, vec4 _norm, vec4 _color, float _power) {
+Light::Light(vec4 _center, float _a_len, float _b_len, vec4 _norm, vec4 _a_vec,vec4 _color, float _power) {
     center = _center;
-    width  = _width;
-    length = _length;
+    a_len  = _a_len;
+    b_len  = _b_len;
+    a_vec  = _a_vec;
     norm   = _norm;
     color  = _color;
     power  = _power;

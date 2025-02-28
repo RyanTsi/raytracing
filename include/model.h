@@ -33,14 +33,15 @@ struct Texture {
 
 class Light {
 public:
-    Light(vec4 _center, float _width, float _length, vec4 _norm, vec4 _color, float _power);
+    Light(vec4 _center, float _a_len, float b_len, vec4 _norm, vec4 _a_vec,vec4 _color, float _power);
     ~Light();
 private:
     vec4 center;
     vec4 norm;
+    vec4 a_vec;
     vec4 color;
-    float width;
-    float length;
+    float a_len;
+    float b_len;
     float power;
 };
 
