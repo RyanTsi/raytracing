@@ -47,7 +47,7 @@ int main() {
 
     // my shader
     Shader shader("C:/Users/solaryan/Desktop/CG/raytracing/src/shaders/vertexshader.vert", "C:/Users/solaryan/Desktop/CG/raytracing/src/shaders/pathtracing.frag");
-    Scene Xmodel("C:/Users/solaryan/Desktop/CG/raytracing/assets/2cubes/test2.obj");
+    Scene Xmodel("C:/Users/solaryan/Desktop/CG/raytracing/assets/2cubes/test1.glb");
 
     std::cout << "------ Begin ------" << std::endl;
 
@@ -72,15 +72,6 @@ int main() {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // also clear the depth buffer now!
         // 使用着色器程序，使用后才能 set
         shader.use();
-
-        // -- add --
-        // shader.setMat4("project", camera.getProjectionMatrix());
-        // shader.setMat4("view", camera.getViewMatrix());
-        // glm::mat4 model(1.0f);
-        // shader.setMat4("model", model);
-        // shader.setVec3("lightPos", lightPos);
-        // shader.setVec3("lightColor", lightColor);
-        // -- end --
         
         Xmodel.draw(shader);
 

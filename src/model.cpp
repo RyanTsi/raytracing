@@ -46,13 +46,6 @@ void Mesh::setupMesh() {
 }
 
 void Mesh::draw(Shader &shader)  {
-    shader.setVec3("material.ambient",  material->ambient);
-    shader.setVec3("material.diffuse",  material->diffuse);
-    shader.setVec3("material.specular", material->specular);
-    shader.setVec3("material.emissive", material->emissive);
-    shader.setFloat("material.shininess", material->shininess);
-    shader.setFloat("material.reflact", material->reflact);
-    shader.setFloat("material.opacity", material->opacity);
     // draw mesh
     glBindVertexArray(VAO);
     glDrawElements(GL_TRIANGLES, static_cast<unsigned int>(indices.size()), GL_UNSIGNED_INT, 0);
@@ -65,7 +58,7 @@ void Mesh::draw(Shader &shader)  {
 Scene::Scene(const char *path) {
     isInit = false;
     loadScene(path);
-    addLight(Light(vec4(100, 0, 0, 0), 10, 10, vec4(-1, -0.2, -0.2, 0), vec4(0.2, -1, 0, 0), vec4(1.0, 1.0, 1.0, 1.0), 50000.0));
+    addLight(Light(vec4(100, 0, 0, 0), 10, 10, vec4(-1, -0.2, -0.2, 0), vec4(0.2, -1, 0, 0), vec4(1.0, 1.0, 1.0, 1.0), 2.0));
     // addLight(Light(vec4(0, 0, -100, 0), 100, 100, vec4(0, 0, 1, 0), vec4(1, 0, 0, 0), vec4(1.0, 1.0, 1.0, 0), 50000.0));
     // addLight(Light(vec4(0, 0, 100, 0), 100, 100, vec4(0, 0, -1, 0), vec4(1, 0, 0, 0), vec4(1.0, 1.0, 1.0, 0), 50000.0));
     setFrame();

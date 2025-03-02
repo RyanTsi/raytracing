@@ -2,34 +2,19 @@
 
 Material::Material(const aiMaterial* material) {
     aiColor3D color(0.f, 0.f, 0.f);
-    if (material->Get(AI_MATKEY_COLOR_DIFFUSE, color) != AI_SUCCESS) {
-        error();
+    if (material->Get(AI_MATKEY_BASE_COLOR, color) == AI_SUCCESS) {
+        baseColor = vec4(color.r, color.g, color.b, 1.0f);
     } else {
-        diffuse = vec4(color.r, color.g, color.b, 1.0f);
+        baseColor = vec4(0.8, 0.8, 0.8, 1.0f);
     }
-    if (material->Get(AI_MATKEY_COLOR_SPECULAR, color) != AI_SUCCESS) {
-        error();
-    } else {
-        specular = vec4(color.r, color.g, color.b, 1.0f);
+    if (material->Get(AI_MATKEY_ROUGHNESS_FACTOR, roughness) != AI_SUCCESS) {
+        roughness = 1.0f;
     }
-    if (material->Get(AI_MATKEY_COLOR_AMBIENT, color) != AI_SUCCESS) {
-        error();
-    } else {
-        ambient = vec4(color.r, color.g, color.b, 1.0f);
-    }
-    if (material->Get(AI_MATKEY_COLOR_EMISSIVE, color) != AI_SUCCESS) {
-        error();
-    } else {
-        emissive = vec4(color.r, color.g, color.b, 1.0f);
-    }
-    if (material->Get(AI_MATKEY_REFRACTI, reflact) != AI_SUCCESS) {
-        error();
+    if (material->Get(AI_MATKEY_METALLIC_FACTOR, metallic) != AI_SUCCESS) {
+        metallic = 1.0f;
     }
     if (material->Get(AI_MATKEY_OPACITY, opacity) != AI_SUCCESS) {
-        error();
-    }
-    if (material->Get(AI_MATKEY_SHININESS, shininess) != AI_SUCCESS) {
-        error();
+        opacity  = 1.0f;
     }
 }
 

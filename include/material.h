@@ -9,12 +9,9 @@ class alignas(16) Material {
 public:
     Material(const aiMaterial* material);
     ~Material();
-    vec4 ambient;
-    vec4 diffuse;
-    vec4 specular;
-    vec4 emissive;
-    float shininess;
-    float reflact;
+    vec4 baseColor;
+    float roughness;
+    float metallic;
     float opacity;
 private:
 };

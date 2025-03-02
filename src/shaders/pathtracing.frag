@@ -19,24 +19,8 @@ float pow2(float a) {
     return a * a;
 }
 
-
-uint wseed = 3127143136u;
-uint whash(uint seed) {
-    seed = (seed ^ uint(61)) ^ (seed >> uint(16));
-    seed *= uint(9);
-    seed = seed ^ (seed >> uint(4));
-    seed *= uint(0x27d4eb2d);
-    seed = seed ^ (seed >> uint(15));
-    return seed;
-}
-
-float randcore4() {
-	wseed = whash(wseed);
-	return fract(sin(dot(screen_uv, vec2(12.9898, 78.233))) * 43758.5453123);
-}
-
 float rand() {
-	return randcore4();
+	return fract(sin(dot(screen_uv, vec2(12.9898, 78.233))) * 43758.5453123);
 }
 
 vec3 randomInHalfSphere(vec3 normal) {
@@ -51,12 +35,9 @@ vec3 randomInHalfSphere(vec3 normal) {
 }
 
 struct Material {
-    vec4  ambient;
-    vec4  diffuse;
-    vec4  specular;
-    vec4  emissive;
-    float shininess;
-    float reflact;
+    vec4 baseColor;
+    float roughness;
+    float metallic;
     float opacity;
 }; 
 
@@ -128,64 +109,105 @@ struct HitRecord {
 };
 
 
-// Fresnel Schlick approximation
+// 辅助函数：饱和函数
+float saturate(float x) {
+    return clamp(x, 0.0, 1.0);
+}
+
+// 辅助函数：Schlick近似Fresnel项
 vec3 fresnelSchlick(float cosTheta, vec3 F0) {
     return F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0);
 }
 
-// GGX Normal Distribution Function
-float distributionGGX(vec3 N, vec3 H, float roughness) {
-    float a = pow2(roughness);
-    float a2 = pow2(a);
+// 辅助函数：GGX NDF
+float DistributionGGX(vec3 N, vec3 H, float roughness) {
+    float a = roughness * roughness;
+    float a2 = a * a;
     float NdotH = max(dot(N, H), 0.0);
-    float NdotH2 = pow2(NdotH);
-    float nom = a2;
+    float NdotH2 = NdotH * NdotH;
+
+    float nom   = a2;
     float denom = (NdotH2 * (a2 - 1.0) + 1.0);
-    denom = PI * pow2(denom);
+    denom = PI * denom * denom;
 
     return nom / denom;
 }
 
-// Geometry Schlick GGX
-float geometrySchlickGGX(float NdotV, float roughness) {
+// 辅助函数：几何遮蔽函数（Smith's Schlick-GGX）
+float GeometrySchlickGGX(float NdotV, float roughness) {
     float r = (roughness + 1.0);
-    float k = pow2(r) / 8.0;
-    float nom = NdotV;
+    float k = (r * r) / 8.0;
+
+    float nom   = NdotV;
     float denom = NdotV * (1.0 - k) + k;
+
     return nom / denom;
 }
 
-// Geometry Smith
-float geometrySmith(vec3 N, vec3 V, vec3 L, float roughness) {
+float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness) {
     float NdotV = max(dot(N, V), 0.0);
     float NdotL = max(dot(N, L), 0.0);
-    float ggx2 = geometrySchlickGGX(NdotV, roughness);
-    float ggx1 = geometrySchlickGGX(NdotL, roughness);
+    float ggx2 = GeometrySchlickGGX(NdotV, roughness);
+    float ggx1 = GeometrySchlickGGX(NdotL, roughness);
 
     return ggx1 * ggx2;
 }
 
-vec3 calBRDF(vec3 lightDir, vec3 viewDir, vec3 normal, Material material) {
-    vec3 halfVec = normalize(lightDir + viewDir);
-    float roughness = sqrt(2.0 / (material.shininess + 2.0));
-    vec3  F = fresnelSchlick(max(dot(halfVec, viewDir), 0), material.specular.xyz);
-    float D = distributionGGX(normal, halfVec, roughness);
-    float G = geometrySmith(normal, viewDir, lightDir, roughness);
-    // Specular BRDF
+// vec3 calBRDF(vec3 lightDir, vec3 viewDir, vec3 normal, Material material) {
+//     vec3 halfVec = normalize(lightDir + viewDir);
+//     float roughness = sqrt(2.0 / (material.shininess + 2.0));
+//     vec3  F = fresnelSchlick(max(dot(halfVec, viewDir), 0), material.specular.xyz);
+//     float D = distributionGGX(normal, halfVec, roughness);
+//     float G = geometrySmith(normal, viewDir, lightDir, roughness);
+//     // Specular BRDF
+//     vec3 numerator = D * G * F;
+//     float denominator = 4.0 * max(dot(normal, viewDir), 0.0) * max(dot(normal, lightDir), 0.0);
+//     vec3 specular = numerator / max(denominator, 0.001);
+    
+//     // Diffuse BRDF
+//     vec3 kS = F;
+//     vec3 kD = vec3(1.0) - kS;
+//     kD *= 1.0;
+    
+//     float NdotL = max(dot(normal, lightDir), 0.0);
+//     vec3 diffuse = (kD * material.diffuse.xyz) / PI;
+    
+//     // Combine diffuse and specular components
+//     return (diffuse + specular) * NdotL;
+// }
+
+vec3 calBRDF(vec3 V, vec3 L, vec3 N, Material material) {
+    vec3 H = normalize(V + L); // 半角向量
+
+    // 基础颜色
+    vec3 albedo = material.baseColor.rgb;
+
+    // Fresnel项
+    vec3 F0 = mix(vec3(0.04), albedo, material.metallic); // 默认为0.04，金属度为1时使用albedo
+    vec3 F = fresnelSchlick(max(dot(H, V), 0.0), F0);
+
+    // 粗糙度
+    float roughness = material.roughness;
+
+    // NDF
+    float D = DistributionGGX(N, H, roughness);
+
+    // 几何遮蔽
+    float G = GeometrySmith(N, V, L, roughness);
+
+    // 镜面反射部分
     vec3 numerator = D * G * F;
-    float denominator = 4.0 * max(dot(normal, viewDir), 0.0) * max(dot(normal, lightDir), 0.0);
-    vec3 specular = numerator / max(denominator, 0.001);
-    
-    // Diffuse BRDF
-    vec3 kS = F;
-    vec3 kD = vec3(1.0) - kS;
-    kD *= 1.0;
-    
-    float NdotL = max(dot(normal, lightDir), 0.0);
-    vec3 diffuse = (kD * material.diffuse.xyz) / PI;
-    
-    // Combine diffuse and specular components
-    return (diffuse + specular) * NdotL;
+    float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.001; // + 0.001防止除零
+    vec3 specular = numerator / denominator;
+
+    // 漫反射部分
+    vec3 kD = vec3(1.0) - F;
+    kD *= 1.0 - material.metallic; // 金属没有漫反射
+    vec3 diffuse = albedo / PI;
+
+    // 最终结果
+    float NdotL = max(dot(N, L), 0.0);
+    return (kD * diffuse + specular) * NdotL;
 }
 
 struct RayStackEntry {
@@ -285,13 +307,13 @@ vec3 trace(Ray r0, HitRecord h0) {
         if(hit) {
             if(hitrecord.isLight == true) {
                 res = lights[hitrecord.materialIdx].power * lights[hitrecord.materialIdx].color.rgb;
-                while(stackTop >= 1) {
-                    Ray r0 = stack[stackTop].ray;
-                    stackTop --;
-                    Ray r1 = stack[stackTop].ray;
-                    Material material = materials[stack[stackTop].hitrecord.materialIdx];
-                    res *= material.diffuse.xyz;
-                }
+                // while(stackTop >= 1) {
+                //     Ray r0 = stack[stackTop].ray;
+                //     stackTop --;
+                //     Ray r1 = stack[stackTop].ray;
+                //     Material material = materials[stack[stackTop].hitrecord.materialIdx];
+                //     res *= calBRDF(r0.dir, r1.dir, stack[stackTop].hitrecord.normal, material);
+                // }
                 break;
             } else {
                 if(stackTop + 1 == maxDep) {
@@ -315,21 +337,21 @@ void main() {
     hitrecord.dis = 1e12;
     hitrecord.normal = uCamera.front;
     Ray ray = calFirstRay();
-    // float minDis;
-    // bool hit = false;
-    // for(uint i = 0; i < triangles_Data.length(); i ++) {
-    //     Triangle triangle = formTriangleData(i);
-    //     if(intersectTriangle(ray, triangle, hitrecord)) {
-    //         hit = true;
-    //         FragColor = vec4(0.5, 0.5, 1, 1);
-    //     }
-    // }
-    // if(!hit) {
-    //     FragColor = vec4(1, 1, 1, 1);
-    // } else {
-    //     FragColor = materials[hitrecord.materialIdx].diffuse;
-    // }
-    FragColor = vec4(trace(ray, hitrecord), 0);
+    float minDis;
+    bool hit = false;
+    for(uint i = 0; i < triangles_Data.length(); i ++) {
+        Triangle triangle = formTriangleData(i);
+        if(intersectTriangle(ray, triangle, hitrecord)) {
+            hit = true;
+            FragColor = vec4(0.5, 0.5, 1, 1);
+        }
+    }
+    if(!hit) {
+        FragColor = vec4(1, 1, 1, 1);
+    } else {
+        // FragColor = materials[hitrecord.materialIdx].baseColor;
+    }
+    // FragColor = vec4(trace(ray, hitrecord), 0);
 
 
     // bool hit = false;
