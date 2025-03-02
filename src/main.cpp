@@ -47,7 +47,7 @@ int main() {
 
     // my shader
     Shader shader("C:/Users/solaryan/Desktop/CG/raytracing/src/shaders/vertexshader.vert", "C:/Users/solaryan/Desktop/CG/raytracing/src/shaders/pathtracing.frag");
-    Scene Xmodel("C:/Users/solaryan/Desktop/CG/raytracing/assets/2cubes/test0.obj");
+    Scene Xmodel("C:/Users/solaryan/Desktop/CG/raytracing/assets/2cubes/test2.obj");
 
     std::cout << "------ Begin ------" << std::endl;
 
@@ -86,6 +86,7 @@ int main() {
 
         glfwSwapBuffers(window);
         glfwPollEvents();
+        // break;
     }
 
     // ------ release ------

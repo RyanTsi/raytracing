@@ -31,7 +31,7 @@ struct Texture {
     std::string path;
 };
 
-class Light {
+class alignas(16) Light {
 public:
     Light(vec4 _center, float _a_len, float b_len, vec4 _norm, vec4 _a_vec,vec4 _color, float _power);
     ~Light();

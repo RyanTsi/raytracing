@@ -15,20 +15,39 @@ struct Camera {
 };
 uniform Camera uCamera;
 
-float rand(vec2 co) {
-    return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
-}
-
 float pow2(float a) {
     return a * a;
 }
 
-vec3 randomInUnitSphere() {
-    vec3 p;
-    do {
-        p = 2.0 * vec3(rand(gl_FragCoord.xy), rand(gl_FragCoord.yx), rand(-gl_FragCoord.xy)) - vec3(1, 1, 1);
-    } while(dot(p, p) >= 1.0);
-    return p;
+
+uint wseed = 3127143136u;
+uint whash(uint seed) {
+    seed = (seed ^ uint(61)) ^ (seed >> uint(16));
+    seed *= uint(9);
+    seed = seed ^ (seed >> uint(4));
+    seed *= uint(0x27d4eb2d);
+    seed = seed ^ (seed >> uint(15));
+    return seed;
+}
+
+float randcore4() {
+	wseed = whash(wseed);
+	return fract(sin(dot(screen_uv, vec2(12.9898, 78.233))) * 43758.5453123);
+}
+
+float rand() {
+	return randcore4();
+}
+
+vec3 randomInHalfSphere(vec3 normal) {
+    float phi = acos(rand());
+    float theta = rand() * 2 * PI;
+    vec3 u = normalize(vec3(normal.y, -normal.x, 0));
+    vec3 v = normalize(cross(normal, u));
+    float x = cos(theta) * cos(phi);
+    float y = sin(theta) * cos(phi);
+    float z = sin(phi);
+    return normalize(u * x + y * v + z * normal);
 }
 
 struct Material {
@@ -98,7 +117,7 @@ Triangle formTriangleData(uint idx) {
 struct Ray {
     vec3 ori;
     vec3 dir;
-} ray;
+};
 
 struct HitRecord {
     vec3 p;
@@ -106,7 +125,7 @@ struct HitRecord {
     float dis;
     uint materialIdx;
     bool isLight;
-} hitrecord;
+};
 
 
 // Fresnel Schlick approximation
@@ -169,19 +188,26 @@ vec3 calBRDF(vec3 lightDir, vec3 viewDir, vec3 normal, Material material) {
     return (diffuse + specular) * NdotL;
 }
 
-const uint maxDeep = 10;
+struct RayStackEntry {
+    Ray ray;
+    HitRecord hitrecord;
+};
 
-void calFirstRay() {
+const uint maxDep = 10;
+
+Ray calFirstRay() {
     vec2 ndc_uv = screen_uv * 2 - vec2(1.0, 1.0);
     float ratio_y = tan(uCamera.fov / 2.0);
     float ratio_x = ratio_y * uCamera.aspectRatio;
     vec3 right = normalize(cross(uCamera.front, uCamera.up));
+    Ray ray;
     ray.ori = uCamera.position;
     ray.dir = normalize(
         uCamera.front +
         right * ndc_uv.x * ratio_x +
         uCamera.up * ndc_uv.y * ratio_y
     );
+    return ray;
 }
 
 bool intersectTriangle(Ray ray, Triangle triangle, inout HitRecord hitrecord) {
@@ -235,49 +261,86 @@ bool intersectLight(Ray ray, uint lightIdx, inout HitRecord hitrecord) {
     }
 }
 
-vec3 trace(Ray ray, inout HitRecord hitrecord, uint dep) {
-    if(dep > maxDeep) return vec3(0);
-    bool hit = false;
-    hitrecord.dis = 1e12;
-    hitrecord.isLight = false;
-    vec3 res = vec3(1.0);
-    for(uint i = 0; i < triangles_Data.length(); i ++) {
-        if(intersectTriangle(ray, formTriangleData(i), hitrecord)) {
-            hit = true;
+vec3 trace(Ray r0, HitRecord h0) {
+    RayStackEntry stack[maxDep];
+    int stackTop = -1;
+    stack[++stackTop] = RayStackEntry(r0, h0);
+    vec3 res = vec3(0);
+    while(stackTop < maxDep) {
+        bool hit = false;
+        Ray ray_in = stack[stackTop].ray;
+        HitRecord hitrecord = stack[stackTop].hitrecord;
+        for(uint i = 0; i < triangles_Data.length(); i ++) {
+            if(intersectTriangle(ray_in, formTriangleData(i), hitrecord)) {
+                hit = true;
+            }
         }
-    }
-    for(uint i = 0; i < lights.length(); i ++) {
-        if(intersectLight(ray, i, hitrecord)) {
-            hit = true;
+        if(stackTop != 0) {
+            for(uint i = 0; i < lights.length(); i ++) {
+                if(intersectLight(ray_in, i, hitrecord)) {
+                    hit = true;
+                }
+            }
         }
-    }
-    if(hit) {
-        if(hitrecord.isLight == true) {
-            res = vec3(1.0);
+        if(hit) {
+            if(hitrecord.isLight == true) {
+                res = lights[hitrecord.materialIdx].power * lights[hitrecord.materialIdx].color.rgb;
+                while(stackTop >= 1) {
+                    Ray r0 = stack[stackTop].ray;
+                    stackTop --;
+                    Ray r1 = stack[stackTop].ray;
+                    Material material = materials[stack[stackTop].hitrecord.materialIdx];
+                    res *= material.diffuse.xyz;
+                }
+                break;
+            } else {
+                if(stackTop + 1 == maxDep) {
+                    break;
+                }
+                Ray ray_out = Ray(hitrecord.p, randomInHalfSphere(hitrecord.normal));
+                HitRecord h1 = HitRecord(vec3(0), hitrecord.normal, 1e12, 0, false);
+                // res = dot(ray.dir, hitrecord.normal) * brdf * trace(ray_out, hitrecord, dep + 1);
+                stack[++stackTop] = RayStackEntry(ray_out, h1);
+            }
         } else {
-            
+            break;
         }
+    
     }
     return res;
 }
 
 void main() {
+    HitRecord hitrecord;
     hitrecord.dis = 1e12;
-    calFirstRay();
-    float minDis;
-    bool hit = false;
-    for(uint i = 0; i < triangles_Data.length(); i ++) {
-        Triangle triangle = formTriangleData(i);
-        if(intersectTriangle(ray, triangle, hitrecord)) {
-            hit = true;
-            // FragColor = vec4(0.5, 0.5, 1, 1);
-        }
-    }
-    if(!hit) {
-        FragColor = vec4(1, 1, 1, 1);
-    } else {
-        FragColor = materials[hitrecord.materialIdx].diffuse;
-    }
+    hitrecord.normal = uCamera.front;
+    Ray ray = calFirstRay();
+    // float minDis;
+    // bool hit = false;
+    // for(uint i = 0; i < triangles_Data.length(); i ++) {
+    //     Triangle triangle = formTriangleData(i);
+    //     if(intersectTriangle(ray, triangle, hitrecord)) {
+    //         hit = true;
+    //         FragColor = vec4(0.5, 0.5, 1, 1);
+    //     }
+    // }
+    // if(!hit) {
+    //     FragColor = vec4(1, 1, 1, 1);
+    // } else {
+    //     FragColor = materials[hitrecord.materialIdx].diffuse;
+    // }
+    FragColor = vec4(trace(ray, hitrecord), 0);
 
-    // FragColor = vec4(screen_uv, 0.0, 1.0);
+
+    // bool hit = false;
+    // for(int i = 0; i < lights.length(); i ++) {
+    //     if(intersectLight(ray, i, hitrecord)) {
+    //         hit = true;
+    //     }
+    // }
+    // if(hit) {
+    //         FragColor = vec4(1, 1, 1, 1);
+    // } else {
+    //         FragColor = vec4(0, 0, 0, 1);
+    // }
 }
