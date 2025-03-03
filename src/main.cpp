@@ -47,12 +47,12 @@ int main() {
 
     // my shader
     Shader shader("C:/Users/solaryan/Desktop/CG/raytracing/src/shaders/vertexshader.vert", "C:/Users/solaryan/Desktop/CG/raytracing/src/shaders/pathtracing.frag");
-    Scene Xmodel("C:/Users/solaryan/Desktop/CG/raytracing/assets/2cubes/test1.glb");
+    Scene Xmodel("C:/Users/solaryan/Desktop/CG/raytracing/assets/2cubes/test1.obj");
 
     std::cout << "------ Begin ------" << std::endl;
 
-    double last_time = glfwGetTime(), detaTime;
-	double fps = 60, counter_time = 0, counter_frame = 0;
+    float last_time = glfwGetTime(), detaTime;
+	float fps = 60, counter_time = 0, counter_frame = 0;
 
     // ---------- render loop ----------
     while (!glfwWindowShouldClose(window)) {
@@ -73,6 +73,8 @@ int main() {
         // 使用着色器程序，使用后才能 set
         shader.use();
         
+        shader.setFloat("iTime", detaTime - int(detaTime));
+
         Xmodel.draw(shader);
 
         glfwSwapBuffers(window);

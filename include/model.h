@@ -33,7 +33,7 @@ struct Texture {
 
 class alignas(16) Light {
 public:
-    Light(vec4 _center, float _a_len, float b_len, vec4 _norm, vec4 _a_vec,vec4 _color, float _power);
+    Light(vec4 _center, float _a_len, float _b_len, vec4 _norm, vec4 _a_vec,vec4 _color, float _power);
     ~Light();
 private:
     vec4 center;
