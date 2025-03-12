@@ -40,6 +40,11 @@ int main() {
 
     // set init state and callback function
     glViewport(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+    // ---- add ----
+        // 设置混合函数
+    // glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    // ---- add end ----
+
     // glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
     // glfwSetKeyCallback(window, key_callback);
 
@@ -47,7 +52,7 @@ int main() {
 
     // my shader
     Shader shader("C:/Users/solaryan/Desktop/CG/raytracing/src/shaders/vertexshader.vert", "C:/Users/solaryan/Desktop/CG/raytracing/src/shaders/pathtracing.frag");
-    Scene Xmodel("C:/Users/solaryan/Desktop/CG/raytracing/assets/2cubes/test1.obj");
+    Scene Xmodel("C:/Users/solaryan/Desktop/CG/raytracing/assets/2cubes/test4.obj");
 
     std::cout << "------ Begin ------" << std::endl;
 
@@ -69,7 +74,7 @@ int main() {
         // ------ record ------
 
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // also clear the depth buffer now!
+        glClear(GL_COLOR_BUFFER_BIT);
         // 使用着色器程序，使用后才能 set
         shader.use();
         

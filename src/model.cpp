@@ -58,7 +58,7 @@ void Mesh::draw(Shader &shader)  {
 Scene::Scene(const char *path) {
     isInit = false;
     loadScene(path);
-    addLight(Light(vec4(100, 0, 0, 0), 10, 10, vec4(-1, -0.2, -0.2, 0), vec4(0.2, -1, 0, 0), vec4(1.0, 1.0, 1.0, 1.0), 2000.0));
+    addLight(Light(vec4(10, 0, 30, 0), 50, 50, vec4(-1, -0.6, -0.6, 0), vec4(0.6, -1, 0, 0), vec4(1.0, 1.0, 1.0, 1.0), 10.0));
     // addLight(Light(vec4(0, 0, -100, 0), 100, 100, vec4(0, 0, 1, 0), vec4(1, 0, 0, 0), vec4(1.0, 1.0, 1.0, 0), 50000.0));
     // addLight(Light(vec4(0, 0, 100, 0), 100, 100, vec4(0, 0, -1, 0), vec4(1, 0, 0, 0), vec4(1.0, 1.0, 1.0, 0), 50000.0));
     setFrame();
@@ -94,9 +94,9 @@ void Scene::setInShaderD(Shader &shader) {
 void Scene::setInShaderS(Shader &shader) {
     shader.setInt("SCREEN_WIDTH", SCREEN_WIDTH);
     shader.setInt("SCREEN_HEIGHT", SCREEN_HEIGHT);
-    shader.addSSBO("triangleBuffer", trianglesBuffer.data(), trianglesBuffer.size() * sizeof(TriangleData), 3);
     shader.addSSBO("lightBuffer", lights.data(), lights.size() * sizeof(Light), 1);    
     shader.addSSBO("materialBuffer", materials.data(), materials.size() * sizeof(Material), 2);
+    shader.addSSBO("triangleBuffer", trianglesBuffer.data(), trianglesBuffer.size() * sizeof(TriangleData), 3);
 }
 
 void Scene::setFrame() {

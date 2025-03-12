@@ -1,9 +1,10 @@
 #version 460 core
 
-#define maxDep 16
+#define maxDep 24
+#define sampCnt 32
 
-const float PI = 3.14159265358979323846;
-const float EPSILON = 0.0000001;
+const float PI = 3.14159265358979323846; 
+const float EPSILON = 0.00001;
 
 in vec2 screen_uv;
 out vec4 FragColor;
@@ -17,17 +18,25 @@ struct Camera {
     float fov;
     float aspectRatio;
 };
+
 uniform Camera uCamera;
 
+vec2 seed = vec2(0);
+
 float rand(vec2 co) {
-	return fract((sin(dot(co + screen_uv + iTime, vec2(12.9898, 78.233)))) * 43758.5453123);
+    return fract((sin(dot(co * screen_uv + iTime + seed, vec2(82.9898, 78.233)))) * 43758.5453123);
 }
 
-vec3 randomInHalfSphere(vec3 normal) {
-    float phi = acos(rand(normal.zx));
-    float theta = rand(normal.xy) * 2 * PI;
-    vec3 u = normalize(vec3(normal.y, -normal.x, 0));
-    vec3 v = normalize(cross(normal, u));
+vec2 rand2(vec2 p) {
+    p = vec2(rand(p), rand(p * screen_uv * 100.0));
+    return -1.0 + 2.0 * p;
+}
+
+vec3 randomInHalfSphere(vec3 normal, vec3 position) {
+    float phi = acos(rand(normal.zx * 7.25 + position.xy * 9.17));
+    float theta = rand(normal.xz * 7.97 + position.xy * 17.27) * 2 * PI;
+    vec3  u = normalize(vec3(normal.y, -normal.x, 0));
+    vec3  v = normalize(cross(normal, u));
     float x = cos(theta) * cos(phi);
     float y = sin(theta) * cos(phi);
     float z = sin(phi);
@@ -115,7 +124,8 @@ vec3 fresnelSchlick(float cosTheta, vec3 F0) {
 
 // GGX NDF
 float DistributionGGX(vec3 N, vec3 H, float roughness) {
-    float a2 = roughness * roughness;
+    float a  = roughness * roughness;
+    float a2 = a * a;
     float NdotH = max(dot(N, H), 0.0);
     float NdotH2 = NdotH * NdotH;
     float nom   = a2;
@@ -164,11 +174,11 @@ vec3 calBRDF(vec3 V, vec3 L, vec3 N, Material material) {
     vec3 specular = numerator / denominator;
     // 漫反射部分
     vec3 kD = vec3(1.0) - F;
-    kD *= 1.0 - material.metallic; // 金属没有漫反射
+    kD *= 1.0 - material.metallic;
     vec3 diffuse = albedo / PI;
     // 最终结果
     float NdotL = max(dot(N, L), 0.0);
-    return (kD * diffuse + (1 - kD) * specular) * NdotL;
+    return kD * diffuse + specular;
 }
 
 struct RayStackEntry {
@@ -191,36 +201,6 @@ Ray calFirstRay() {
     return ray;
 }
 
-// bool intersectTriangle(Ray ray, Triangle triangle, inout HitRecord hitrecord) {
-//     vec3 a = triangle.vert[0].position, b = triangle.vert[1].position, c = triangle.vert[2].position;
-//     vec3 e1 = b - a, e2 = c - a;
-//     vec3 h = cross(ray.dir, e2);
-//     float det = dot(e1, h);
-//     if(det > -EPSILON && det < EPSILON) {
-//         return false;
-//     }
-//     vec3 s = ray.ori - a;
-//     float u = dot(s, h) / det;
-//     vec3 q = cross(s, e1);
-//     float v = dot(ray.dir, q) / det;
-//     float w = 1 - u - v;
-//     if(u < 0 || v < 0 || u + v > 1) {
-//         return false;
-//     }
-//     float k;
-//     k = dot(e2, q) / det;
-//     if(k > EPSILON && k < hitrecord.dis) {
-//         hitrecord.p = ray.ori + ray.dir * k;
-//         hitrecord.normal = normalize(w * triangle.vert[0].normal + u * triangle.vert[1].normal + v * triangle.vert[2].normal);
-//         hitrecord.dis = k;
-//         hitrecord.materialIdx = triangle.materialIdx;
-//         hitrecord.isLight = false;
-//         return true;
-//     } else {
-//         return false;
-//     }
-// }
-
 bool intersectTriangle(Ray ray, Triangle triangle, inout HitRecord hitrecord) {
     vec3 a = triangle.vert[0].position, b = triangle.vert[1].position, c = triangle.vert[2].position;
     vec3 e1 = b - a, e2 = c - a;
@@ -236,15 +216,15 @@ bool intersectTriangle(Ray ray, Triangle triangle, inout HitRecord hitrecord) {
     float v = dot(cross((p - a), e2), normal) / s;
     float w = dot(cross(e1, (p - a)), normal) / s;
     float u = 1 - v - w;
-    if(k < EPSILON || u < 0 || w < 0 || u + w > 1 || k > hitrecord.dis) {
-        return false;
-    } else {
+    if(k > EPSILON && v > 0 && w > 0 && v + w < 1 && k < hitrecord.dis) {
         hitrecord.p = p;
         hitrecord.normal = normalize(u * triangle.vert[0].normal + v * triangle.vert[1].normal + w * triangle.vert[2].normal);
         hitrecord.dis = k;
         hitrecord.materialIdx = triangle.materialIdx;
         hitrecord.isLight = false;
         return true;
+    } else {
+        return false;
     }
 }
 
@@ -261,7 +241,8 @@ bool intersectLight(Ray ray, uint lightIdx, inout HitRecord hitrecord) {
     }
     float k = dot(light.normal.xyz, light.center.xyz - ray.ori) / r;
     vec3 p = ray.ori + k * ray.dir;
-    if(k > EPSILON && k < hitrecord.dis && dot(p, u) < light.a_len && dot(p, v) < light.b_len) {
+    vec3 D = p - light.center.xyz;
+    if(k > EPSILON && k < hitrecord.dis && 2.0 * abs(dot(D, u)) < light.a_len && 2.0 * abs(dot(D, v)) < light.b_len) {
         hitrecord.p = ray.ori + ray.dir * k;
         hitrecord.normal = light.normal.xyz;
         hitrecord.dis = k;
@@ -281,64 +262,84 @@ vec3 trace(Ray r0, HitRecord h0) {
     while(stackTop < maxDep) {
         bool hit = false;
         Ray ray_in = stack[stackTop].ray;
-        HitRecord hitrecord = stack[stackTop].hitrecord;
+        vec3 color = vec3(0);
         for(uint i = 0; i < triangles_Data.length(); i ++) {
-            if(intersectTriangle(ray_in, formTriangleData(i), hitrecord)) {
+            if(intersectTriangle(ray_in, formTriangleData(i), stack[stackTop].hitrecord)) {
                 hit = true;
             }
         }
         if(stackTop != 0) {
             for(uint i = 0; i < lights.length(); i ++) {
-                if(intersectLight(ray_in, i, hitrecord)) {
+                if(intersectLight(ray_in, i, stack[stackTop].hitrecord)) {
                     hit = true;
                 }
             }
         }
         if(hit) {
-            if(hitrecord.isLight == true) {
-                // TODO: 
-                res = lights[hitrecord.materialIdx].power * lights[hitrecord.materialIdx].color.rgb;
-                while(stackTop >= 1) {
-                    Ray rL = stack[stackTop--].ray;
-                    Ray rV = stack[stackTop].ray;
-                    Material material = materials[stack[stackTop].hitrecord.materialIdx];
-                    res *= calBRDF(rV.dir, -rL.dir, stack[stackTop].hitrecord.normal, material);
-                }
+            if(stack[stackTop].hitrecord.isLight == true) {
                 break;
             } else {
                 if(stackTop + 1 == maxDep) {
                     break;
                 }
-                Ray ray_out = Ray(hitrecord.p, randomInHalfSphere(hitrecord.normal));
-                HitRecord h1 = HitRecord(vec3(0), hitrecord.normal, 1e12, 0, false);
-                // res = dot(ray.dir, hitrecord.normal) * brdf * trace(ray_out, hitrecord, dep + 1);
+                Ray ray_out = Ray(stack[stackTop].hitrecord.p, randomInHalfSphere(stack[stackTop].hitrecord.normal, stack[stackTop].hitrecord.p));
+                HitRecord h1 = HitRecord(vec3(0), vec3(0), 1e12, 0, false);
                 stack[++stackTop] = RayStackEntry(ray_out, h1);
             }
         } else {
             break;
         }
     }
+    Ray rL = stack[stackTop].ray, rV;
+    HitRecord rec = stack[stackTop].hitrecord;
+    if(stack[stackTop].hitrecord.isLight == true) {
+        res = lights[rec.materialIdx].power * lights[rec.materialIdx].color.rgb * dot(lights[rec.materialIdx].normal.xyz, -rL.dir);
+    }
+    stackTop --;
+    while(stackTop > -1) {
+        rV = stack[stackTop].ray;
+        rec = stack[stackTop].hitrecord;
+        vec3 dirLight = vec3(0);
+        for(uint i = 0; i < lights.length(); i ++) {
+            vec2 luv = rand2(rec.p.yz) - 0.5;
+            vec3 pT = lights[i].center.xyz + lights[i].a_vec.xyz * luv.x + normalize(cross(lights[i].normal.xyz, lights[i].a_vec.xyz)) * luv.y;
+            vec3 d = pT - rec.p;
+            Ray rT = Ray(rec.p, normalize(d));
+            HitRecord hT; hT.dis = d.length() - 5 * EPSILON;
+            bool hit2 = false;
+            for(uint j = 0; j < triangles_Data.length(); j ++) {
+                if(intersectTriangle(rT, formTriangleData(j), hT)) {
+                    hit2 = true;
+                    break;
+                }
+            }
+            if(!hit2) {
+                dirLight = lights[i].power * lights[i].color.rgb *
+                           calBRDF(-rV.dir, rT.dir, rec.normal, materials[rec.materialIdx]) *
+                           dot(rec.normal, rT.dir) * dot(lights[i].normal.xyz, -rT.dir) / dot(d, d) *
+                           lights[i].a_len * lights[i].b_len;
+            }
+        }
+        stackTop --;
+        res =  res * calBRDF(-rV.dir, rL.dir, rec.normal, materials[rec.materialIdx]) * dot(rec.normal, rL.dir) * 2 * PI;
+        // res *= dirLight;
+        rL = rV;
+    }
+
     return res;
 }
+
 
 void main() {
     HitRecord hitrecord;
     hitrecord.dis = 1e12;
     hitrecord.normal = uCamera.front;
     Ray ray = calFirstRay();
-    // float minDis;
-    // bool hit = false;
-    // for(uint i = 0; i < triangles_Data.length(); i ++) {
-    //     Triangle triangle = formTriangleData(i);
-    //     if(intersectTriangle(ray, triangle, hitrecord)) {
-    //         hit = true;
-    //         FragColor = vec4(0.5, 0.5, 1, 1);
-    //     }
-    // }
-    // if(!hit) {
-    //     FragColor = vec4(1, 1, 1, 1);
-    // } else {
-    //     FragColor = materials[hitrecord.materialIdx].baseColor;
-    // }
-    FragColor = vec4(trace(ray, hitrecord), 0);
+    vec3 resColor = vec3(0);
+    for(uint i = 0; i < sampCnt; i ++) {
+        resColor += trace(ray, hitrecord) / sampCnt;
+        seed += rand2(screen_uv);
+    }
+
+    FragColor = vec4(resColor, 1);
 }
