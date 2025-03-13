@@ -58,7 +58,7 @@ void Mesh::draw(Shader &shader)  {
 Scene::Scene(const char *path) {
     isInit = false;
     loadScene(path);
-    addLight(Light(vec4(10, 0, 30, 0), 50, 50, vec4(-1, -0.6, -0.6, 0), vec4(0.6, -1, 0, 0), vec4(1.0, 1.0, 1.0, 1.0), 10.0));
+    addLight(Light(vec4(20, 5, 30, 0), 20, 20, vec4(-1, -0.2, -0.6, 0), vec4(0.2, -1, 0, 0), vec4(1.0, 1.0, 1.0, 1.0), 15.0));
     // addLight(Light(vec4(0, 0, -100, 0), 100, 100, vec4(0, 0, 1, 0), vec4(1, 0, 0, 0), vec4(1.0, 1.0, 1.0, 0), 50000.0));
     // addLight(Light(vec4(0, 0, 100, 0), 100, 100, vec4(0, 0, -1, 0), vec4(1, 0, 0, 0), vec4(1.0, 1.0, 1.0, 0), 50000.0));
     setFrame();

@@ -130,7 +130,6 @@ void Shader::addSSBO(const std::string &name, const void *data, size_t size, GLu
 SSBO::SSBO(const std::string& ssboName, GLuint programID, size_t size, GLuint binding) 
     : name(ssboName), bufferSize(size), ssboID(0), bindingPoint(binding) {
     glGenBuffers(1, &ssboID);
-    // std::cout << ssboID << std::endl;
 }
 
 SSBO::SSBO() {}
@@ -138,6 +137,7 @@ SSBO::SSBO() {}
 SSBO::~SSBO() {
     if (ssboID != 0) {
         glDeleteBuffers(1, &ssboID);
+        ssboID = 0;
     }
 }
 

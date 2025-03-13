@@ -1,7 +1,7 @@
 #version 460 core
 
-#define maxDep 24
-#define sampCnt 32
+#define maxDep 4
+#define sampCnt 40
 
 const float PI = 3.14159265358979323846; 
 const float EPSILON = 0.00001;
@@ -124,8 +124,7 @@ vec3 fresnelSchlick(float cosTheta, vec3 F0) {
 
 // GGX NDF
 float DistributionGGX(vec3 N, vec3 H, float roughness) {
-    float a  = roughness * roughness;
-    float a2 = a * a;
+    float a2 = roughness * roughness;
     float NdotH = max(dot(N, H), 0.0);
     float NdotH2 = NdotH * NdotH;
     float nom   = a2;
@@ -160,7 +159,7 @@ vec3 calBRDF(vec3 V, vec3 L, vec3 N, Material material) {
     // 基础颜色
     vec3 albedo = material.baseColor.rgb;
     // Fresnel项
-    vec3 F0 = mix(vec3(0.04), albedo, material.metallic); // 默认为0.04，金属度为1时使用albedo
+    vec3 F0 = mix(vec3(0.04), albedo, material.metallic);
     vec3 F = fresnelSchlick(max(dot(H, V), 0.0), F0);
     // 粗糙度
     float roughness = material.roughness;
@@ -170,7 +169,7 @@ vec3 calBRDF(vec3 V, vec3 L, vec3 N, Material material) {
     float G = GeometrySmith(N, V, L, roughness);
     // 镜面反射部分
     vec3 numerator = D * G * F;
-    float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.001; // + 0.001防止除零
+    float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + EPSILON;
     vec3 specular = numerator / denominator;
     // 漫反射部分
     vec3 kD = vec3(1.0) - F;
@@ -282,7 +281,7 @@ vec3 trace(Ray r0, HitRecord h0) {
                 if(stackTop + 1 == maxDep) {
                     break;
                 }
-                Ray ray_out = Ray(stack[stackTop].hitrecord.p, randomInHalfSphere(stack[stackTop].hitrecord.normal, stack[stackTop].hitrecord.p));
+                Ray ray_out = Ray(stack[stackTop].hitrecord.p + EPSILON * stack[stackTop].hitrecord.normal, randomInHalfSphere(stack[stackTop].hitrecord.normal, stack[stackTop].hitrecord.p));
                 HitRecord h1 = HitRecord(vec3(0), vec3(0), 1e12, 0, false);
                 stack[++stackTop] = RayStackEntry(ray_out, h1);
             }
@@ -321,8 +320,7 @@ vec3 trace(Ray r0, HitRecord h0) {
             }
         }
         stackTop --;
-        res =  res * calBRDF(-rV.dir, rL.dir, rec.normal, materials[rec.materialIdx]) * dot(rec.normal, rL.dir) * 2 * PI;
-        // res *= dirLight;
+        res = dirLight + res * calBRDF(-rV.dir, rL.dir, rec.normal, materials[rec.materialIdx]) * dot(rec.normal, rL.dir) * 2 * PI;
         rL = rV;
     }
 
