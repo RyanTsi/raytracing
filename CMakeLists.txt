@@ -1,79 +1,76 @@
-cmake_minimum_required(VERSION 3.10)
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
+# Projects Settings
+cmake_minimum_required (VERSION 3.20)
 
-project(Renderer)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4514")
+if(MSVC)
+    # Disable specific warnings
+    target_compile_options(${TARGET} PRIVATE 
+        /wd4464  # Relative include path warning
+        /wd4820  # Padding added after data member
+        /wd4365  # Signed/unsigned mismatch
+        /wd4244  # Conversion from 'double' to 'float', possible loss of data
+        /wd5267  # Deprecated implicit assignment operator
+        /wd5045  # Spectre mitigation
+    )
+endif()
+project (RayTracing)
 
-set(CMAKE_PREFIX_PATH ${PROJECT_SOURCE_DIR}/external)
-set(glfw3_DIR ${PROJECT_SOURCE_DIR}/external/GLFW/lib/cmake/glfw3)
+set(TARGET rtrt)
 
-find_package(glfw3 REQUIRED)
-find_package(glm REQUIRED)
-find_package(Assimp REQUIRED)
-
-add_subdirectory(${PROJECT_SOURCE_DIR}/external/glad)
-add_subdirectory(${PROJECT_SOURCE_DIR}/external/stb_image)
-
-link_directories(
-    ${PROJECT_SOURCE_DIR}/external/Assimp/lib
-    ${PROJECT_SOURCE_DIR}/external/glfw/lib
-)
-
-include_directories(
-    ${PROJECT_SOURCE_DIR}/include
-    ${PROJECT_SOURCE_DIR}/external/glad/include
-    ${PROJECT_SOURCE_DIR}/external/stb_image/include
-    ${PROJECT_SOURCE_DIR}/external/GLFW/include
-    ${Assimp_INCLUDE_DIRS}
-    ${GLM_INCLUDE_DIRS}
-)
-
-add_executable(${PROJECT_NAME} 
-    src/main.cpp 
-    src/shaders/shaderManager.cpp
+# The main executable
+add_executable(${TARGET}
+    src/main.cpp
     src/camera.cpp
-    src/model.cpp
-    src/material.cpp
+    src/camera.h
+    src/tools.cpp
+    src/tools.h
+    src/AABB.cpp
+    src/AABB.h
+    src/BVH.cpp
+    src/BVH.h
+    src/modelManager/light.cpp
+    src/modelManager/light.h
+    src/modelManager/material.cpp
+    src/modelManager/material.h
+    src/modelManager/mesh.cpp
+    src/modelManager/mesh.h
+    src/modelManager/scene.cpp
+    src/modelManager/scene.h
+    src/shaderManager/shader.cpp
+    src/shaderManager/shader.h
+    src/shaderManager/SSBO.cpp
+    src/shaderManager/SSBO.h
 )
 
-target_link_libraries(${PROJECT_NAME} PRIVATE
-    glfw3.lib
-    glad
-    stb_image
-    glm::glm
-    ${ASSIMP_LIBRARIES}
+set_property(TARGET ${TARGET} PROPERTY CXX_STANDARD 17)
+# target_compile_options(${TARGET} PRIVATE -Wall)
+
+add_subdirectory(lib/glad EXCLUDE_FROM_ALL)
+add_subdirectory(lib/glfw EXCLUDE_FROM_ALL)
+add_subdirectory(lib/glm EXCLUDE_FROM_ALL)
+add_subdirectory(lib/imgui EXCLUDE_FROM_ALL)
+add_subdirectory(lib/stb_image EXCLUDE_FROM_ALL)
+add_subdirectory(lib/assimp EXCLUDE_FROM_ALL)
+
+
+target_include_directories(${TARGET} 
+    PRIVATE lib/glad/include 
+    lib/imgui/backends
+    lib/assimp/include
 )
 
-# glsl copy
-file(GLOB_RECURSE SHADER_FILES RELATIVE ${CMAKE_SOURCE_DIR}/src/shaders ${CMAKE_SOURCE_DIR}/src/shaders/*.glsl)
+target_link_libraries(${TARGET}
+    PRIVATE glfw
+    PRIVATE glm
+    PRIVATE glad
+    PRIVATE IMGUI
+    PRIVATE stb_image
+    PRIVATE assimp
+)
 
-foreach(SHADER_FILE IN LISTS SHADER_FILES)
-    get_filename_component(SHADER_PATH "${SHADER_FILE}" PATH)
-    file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/src/shaders/${SHADER_PATH}")
-
-    add_custom_command(
-        OUTPUT "${CMAKE_BINARY_DIR}/src/shaders/${SHADER_FILE}"
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/src/shaders/${SHADER_FILE}" "${CMAKE_BINARY_DIR}/src/shaders/${SHADER_FILE}"
-        MAIN_DEPENDENCY "${CMAKE_SOURCE_DIR}/src/shaders/${SHADER_FILE}"
-        COMMENT "Copying shader ${SHADER_FILE}"
-        VERBATIM
-    )
-
-    list(APPEND SHADERS_COPIED "${CMAKE_BINARY_DIR}/src/shaders/${SHADER_FILE}")
-endforeach()
-
-add_custom_target(CopyShaders ALL DEPENDS ${SHADERS_COPIED})
-
-# copy .dll
-file(GLOB ASSIMP_DLLS "${PROJECT_SOURCE_DIR}/external/Assimp/bin/*.dll")
-
-foreach(DLL_FILE IN LISTS ASSIMP_DLLS)
-    get_filename_component(DLL_NAME "${DLL_FILE}" NAME)
-    add_custom_command(
-        TARGET ${PROJECT_NAME} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${DLL_FILE}"
-            $<TARGET_FILE_DIR:${PROJECT_NAME}>/${DLL_NAME}
-        COMMENT "Copying Assimp DLL ${DLL_NAME}"
-    )
-endforeach()
+target_include_directories(${TARGET}
+    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src
+    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/modelManager
+    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/shaderManager
+    PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/src
+)

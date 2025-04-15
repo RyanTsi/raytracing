@@ -1,5 +1,4 @@
 #include "camera.h"
-#include "tools.h"
 
 Camera::Camera() {
     position        = vec3(0.0f, 0.0f,  0.0f);
@@ -52,7 +51,7 @@ void Camera::pitch(float angle) {
 }
 
 void Camera::yaw(float angle) {
-    mat4 rotateMatrix = glm::rotate(mat4(1.0f), angle * PI / 180, upDirection);
+    mat4 rotateMatrix = glm::rotate(mat4(1.0f), angle * PI / 180.0f, upDirection);
     mat3 rotateMatrix3 = mat3(rotateMatrix);
     front = rotateMatrix3 * front; 
     // norm
