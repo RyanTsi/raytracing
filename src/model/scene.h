@@ -3,6 +3,7 @@
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
+#include <variant>
 #include "mesh.h"
 #include "camera.h"
 #include "light.h"

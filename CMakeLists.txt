@@ -28,18 +28,22 @@ add_executable(${TARGET}
     src/AABB.h
     src/BVH.cpp
     src/BVH.h
-    src/modelManager/light.cpp
-    src/modelManager/light.h
-    src/modelManager/material.cpp
-    src/modelManager/material.h
-    src/modelManager/mesh.cpp
-    src/modelManager/mesh.h
-    src/modelManager/scene.cpp
-    src/modelManager/scene.h
-    src/shaderManager/shader.cpp
-    src/shaderManager/shader.h
-    src/shaderManager/SSBO.cpp
-    src/shaderManager/SSBO.h
+    src/model/light.cpp
+    src/model/light.h
+    src/model/material.cpp
+    src/model/material.h
+    src/model/mesh.cpp
+    src/model/mesh.h
+    src/model/scene.cpp
+    src/model/scene.h
+    src/shader/shader.cpp
+    src/shader/shader.h
+    src/shader/SSBO.cpp
+    src/shader/SSBO.h
+    # src/ui/uiManager.cpp
+    # src/ui/uiManager.h
+    lib/imgui/backends/imgui_impl_glfw.cpp
+    lib/imgui/backends/imgui_impl_opengl3.cpp
 )
 
 set_property(TARGET ${TARGET} PROPERTY CXX_STANDARD 17)
@@ -56,6 +60,7 @@ add_subdirectory(lib/assimp EXCLUDE_FROM_ALL)
 target_include_directories(${TARGET} 
     PRIVATE lib/glad/include 
     lib/imgui/backends
+    lib/imgui
     lib/assimp/include
 )
 
@@ -70,7 +75,9 @@ target_link_libraries(${TARGET}
 
 target_include_directories(${TARGET}
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src
-    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/modelManager
-    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/shaderManager
+    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/model
+    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/shader
+    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/ui
     PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/src
 )
+

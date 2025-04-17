@@ -1,7 +1,9 @@
 #version 460 core
 
-#define maxDep 3
-#define sampCnt 70
+#define maxDep 10
+#define sampCnt 4
+#define STACKDEEP 64
+uniform int A;
 
 const float PI = 3.14159265358979323846; 
 const float EPSILON = 0.00001;
@@ -10,6 +12,11 @@ in vec2 screen_uv;
 out vec4 FragColor;
 
 uniform float iTime;
+
+uniform int frameCount; // 当前帧数
+#define MaxFrameCount 1000;
+uniform sampler2D previousFrame; // 上一帧的累积结果
+uniform mat4 jitterMatrix;
 
 struct Camera {
     vec3 position;
@@ -79,6 +86,16 @@ struct TriangleData {
     uint materialIdx;
 };
 
+struct BVHNode {
+    vec4 mi;
+    vec4 mx;
+    int ls;
+    int rs;
+    int atom;
+    int isleaf;
+};
+
+
 layout(std430, binding = 1) buffer lightBuffer {
     Light lights[];
 };
@@ -89,6 +106,10 @@ layout(std430, binding = 2) buffer materialBuffer {
 
 layout(std430, binding = 3) buffer triangleBuffer {
     TriangleData triangles_Data[];
+};
+
+layout(std430, binding = 4) buffer BVH {
+    BVHNode nodes[];
 };
 
 Triangle formTriangleData(uint idx) {
@@ -117,6 +138,21 @@ struct HitRecord {
     uint materialIdx;
     bool isLight;
 };
+
+// 判断射线是否与 AABB 相交
+bool rayAABBIntersect(Ray ray, vec3 aabbMin, vec3 aabbMax, inout float tMin, inout float tMax) {
+    vec3 invDir = 1.0 / ray.dir;
+    vec3 t0 = (aabbMin - ray.ori) * invDir;
+    vec3 t1 = (aabbMax - ray.ori) * invDir;
+
+    vec3 tNear = min(t0, t1);
+    vec3 tFar  = max(t0, t1);
+
+    tMin = max(max(tNear.x, tNear.y), tNear.z);
+    tMax = min(min(tFar.x, tFar.y), tFar.z);
+
+    return tMax + EPSILON > max(tMin, 0.0);
+}
 
 // Schlick近似Fresnel项
 vec3 fresnelSchlick(float cosTheta, vec3 F0) {
@@ -228,6 +264,41 @@ bool intersectTriangle(Ray ray, Triangle triangle, inout HitRecord hitrecord) {
     }
 }
 
+// 遍历 BVH 树
+bool traverseBVH(Ray ray, inout HitRecord hitrecord) {
+
+    int stack[STACKDEEP]; // 模拟递归的堆栈
+    int stackPtr = 0;
+    
+    stack[stackPtr++] = 0; // 从根节点开始
+    bool res = false;
+    while (stackPtr > 0) {
+        int nodeIdx = stack[--stackPtr];
+        BVHNode node = nodes[nodeIdx];
+
+        // 检查射线是否与当前节点的 AABB 相交
+        float tMin = 0.0, tMax = 1e30;
+        if (!rayAABBIntersect(ray, node.mi.xyz, node.mx.xyz, tMin, tMax)) {
+            continue; // 如果不相交，跳过该节点
+        }
+
+        // 如果是叶子节点，返回对应几何体的索引
+        if (node.isleaf == 1) {
+            res = intersectTriangle(ray, formTriangleData(node.atom), hitrecord) || res;
+        } else {
+            // 否则，将左右子节点压入堆栈
+            if(node.ls != -1) {
+                stack[stackPtr++] = node.ls;
+            }
+            if(node.rs != -1) {
+                stack[stackPtr++] = node.rs;
+            }
+        }
+
+    }
+    return res;
+}
+
 bool intersectLight(Ray ray, uint lightIdx, inout HitRecord hitrecord) {
     Light light = lights[lightIdx];
     vec3 u = light.a_vec.xyz, v = normalize(cross(light.a_vec.xyz, light.normal.xyz));
@@ -259,14 +330,12 @@ vec3 trace(Ray r0, HitRecord h0) {
     int stackTop = -1;
     stack[++stackTop] = RayStackEntry(r0, h0);
     vec3 res = vec3(0);
-    while(stackTop < maxDep) {
+    while(stackTop < A) {
         bool hit = false;
         Ray ray_in = stack[stackTop].ray;
         vec3 color = vec3(0);
-        for(uint i = 0; i < triangles_Data.length(); i ++) {
-            if(intersectTriangle(ray_in, formTriangleData(i), stack[stackTop].hitrecord)) {
-                hit = true;
-            }
+        if(traverseBVH(ray_in, stack[stackTop].hitrecord)) {
+            hit = true;
         }
         if(stackTop != 0) {
             for(uint i = 0; i < lights.length(); i ++) {
@@ -279,10 +348,12 @@ vec3 trace(Ray r0, HitRecord h0) {
             if(stack[stackTop].hitrecord.isLight == true) {
                 break;
             } else {
-                if(stackTop + 1 == maxDep) {
+                if(stackTop + 1 == A) {
                     break;
                 }
                 Ray ray_out = Ray(stack[stackTop].hitrecord.p + EPSILON * stack[stackTop].hitrecord.normal, randomInHalfSphere(stack[stackTop].hitrecord.normal, stack[stackTop].hitrecord.p));
+                float rate = materials[stack[stackTop].hitrecord.materialIdx].metallic * 0.1;
+                ray_out.dir = normalize((1 - rate) * ray_out.dir + rate * (2 * stack[stackTop].hitrecord.normal + ray_in.dir));
                 HitRecord h1 = HitRecord(vec3(0), vec3(0), 1e12, 0, false);
                 stack[++stackTop] = RayStackEntry(ray_out, h1);
             }
@@ -310,11 +381,14 @@ vec3 trace(Ray r0, HitRecord h0) {
         //         Ray rT = Ray(rec.p, normalize(d));
         //         HitRecord hT; hT.dis = d.length() - 5 * EPSILON;
         //         bool hit2 = false;
-        //         for(uint j = 0; j < triangles_Data.length(); j ++) {
-        //             if(intersectTriangle(rT, formTriangleData(j), hT)) {
-        //                 hit2 = true;
-        //                 break;
-        //             }
+        //         // for(uint j = 0; j < triangles_Data.length(); j ++) {
+        //         //     if(intersectTriangle(rT, formTriangleData(j), hT)) {
+        //         //         hit2 = true;
+        //         //         break;
+        //         //     }
+        //         // }
+        //         if(traverseBVH(rT, hT)) {
+        //             hit2 = true;
         //         }
         //         if(!hit2) {
         //             validCnt ++;
@@ -326,11 +400,63 @@ vec3 trace(Ray r0, HitRecord h0) {
         //     dirLight += temp * lights[i].power * lights[i].a_len * lights[i].b_len * validCnt / (sampCnt * sampCnt);
         // }
         stackTop --;
-        res = res * calBRDF(-rV.dir, rL.dir, rec.normal, materials[rec.materialIdx]) * dot(rec.normal, rL.dir) * 2 * PI;
+        res = dirLight + res * calBRDF(-rV.dir, rL.dir, rec.normal, materials[rec.materialIdx]) * dot(rec.normal, rL.dir) * 2 * PI;
         rL = rV;
     }
 
     return res;
+}
+
+vec4 bilateralBlur(sampler2D tex, vec2 uv, vec2 texelSize) {
+    vec4 color = vec4(0.0);
+    float weightSum = 0.0;
+
+    // 空间域权重
+    float spatialSigma = 1.5;
+    // 范围域权重
+    float rangeSigma = 0.1;
+
+    for (int x = -1; x <= 1; ++x) {
+        for (int y = -1; y <= 1; ++y) {
+            vec2 offset = vec2(x, y) * texelSize;
+            vec4 sampleColor = texture(tex, uv + offset);
+            float spatialWeight = exp(-(dot(offset, offset) / (2.0 * spatialSigma * spatialSigma)));
+            float rangeWeight = exp(-length(sampleColor - texture(tex, uv)) / (2.0 * rangeSigma * rangeSigma));
+            float weight = spatialWeight * rangeWeight;
+
+            color += sampleColor * weight;
+            weightSum += weight;
+        }
+    }
+
+    return color / weightSum;
+}
+
+// 高斯模糊函数
+vec4 gaussianBlur(sampler2D tex, vec2 uv, vec2 resolution) {
+    vec4 color = vec4(0.0);
+    vec2 texelSize = 1.0 / resolution;
+
+    // 3x3 高斯核
+    vec2 offsets[9] = vec2[](
+        vec2(-texelSize.x, -texelSize.y), vec2(0.0, -texelSize.y), vec2(texelSize.x, -texelSize.y),
+        vec2(-texelSize.x, 0.0),         vec2(0.0, 0.0),          vec2(texelSize.x, 0.0),
+        vec2(-texelSize.x, texelSize.y), vec2(0.0, texelSize.y), vec2(texelSize.x, texelSize.y)
+    );
+
+    float kernel[9] = float[](
+        1.0, 2.0, 1.0,
+        2.0, 4.0, 2.0,
+        1.0, 2.0, 1.0
+    );
+
+    float weightSum = 0.0;
+    for (int i = 0; i < 9; ++i) {
+        color += texture(tex, uv + offsets[i]) * kernel[i];
+        weightSum += kernel[i];
+    }
+
+    return color / weightSum;
 }
 
 
@@ -339,10 +465,17 @@ void main() {
     hitrecord.dis = 1e12;
     hitrecord.normal = uCamera.front;
     Ray ray = calFirstRay();
-    vec3 resColor = vec3(0);
-    for(uint i = 0; i < sampCnt; i ++) {
-        resColor += trace(ray, hitrecord) / sampCnt;
-        seed += rand2(screen_uv);
+    vec2 resolution = vec2(1080, 720);
+    vec3 resColor;
+    // 获取上一帧的累积结果
+    // 对累积的颜色结果应用双边滤波
+    vec4 blurredColor1 = bilateralBlur(previousFrame, screen_uv, resolution);
+    vec4 blurredColor2 = gaussianBlur(previousFrame, screen_uv, resolution);
+    vec3 accumulatedColor = (0.005 * blurredColor2.rgb + 0.995 * blurredColor1.rgb);
+    if(frameCount < 2000) {
+        resColor = (accumulatedColor * frameCount + trace(ray, hitrecord)) / (frameCount + 1);
+    } else {
+        resColor = accumulatedColor;
     }
 
     FragColor = vec4(resColor, 1);

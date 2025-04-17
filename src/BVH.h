@@ -4,9 +4,18 @@
 #include <math.h>
 #include <algorithm>
 #include <glm/glm.hpp>
+#include <variant>
 #include "AABB.h"
 
 using glm::vec3;
+
+union IntOrFloat {
+    int intValue;
+    float floatValue;
+
+    IntOrFloat(int value) : intValue(value) {}
+    IntOrFloat(float value) : floatValue(value) {}
+};
 
 struct Triangle {
     vec3 a, b, c;
@@ -27,18 +36,18 @@ public:
 
 class BVH {
 private:
-    std::vector<Triangle> triangles;    
-    std::vector<BVHNode>  nodes;
-    // 计算三角形的包围盒
-    AABB computeTriangleBounds(const Triangle& tri) const;
+std::vector<Triangle> triangles;    
+// 计算三角形的包围盒
+AABB computeTriangleBounds(const Triangle& tri) const;
 
-    // 递归构建 BVH
-    BVHNode* buildBVH(int start, int end, int axis);
+// 递归构建 BVH
+BVHNode* buildBVH(int start, int end, int axis);
 
 public:
+    std::vector<BVHNode>  nodes;
     BVH();
     BVH(const std::vector<Triangle>& tris);
-
+    std::vector<IntOrFloat> getData();
     // // 射线与 BVH 相交测试
     // bool intersect(const Vec3& origin, const Vec3& direction) const {
     //     return intersectRecursive(0, origin, direction);

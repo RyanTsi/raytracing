@@ -4,8 +4,8 @@ Scene::Scene(const char *path) {
     isUpdate = true;
     loadScene(path);
     setFrame();
-    camera = Camera(0, 0, 10);
-    addLight(Light(vec3(20, 5, 30), 20, 20, vec3(-1, -0.2, -0.6), vec3(0.2, -1, 0), vec3(1.0, 1.0, 1.0), 15.0));
+    camera = Camera(0, 0, 12);
+    addLight(Light(vec3(20, 6, 20), 20, 20, vec3(-0.7536, 0.1726, -0.6334), vec3(0.1726, 0.7536, 0), vec3(1.0, 1.0, 1.0), 2.4));
 }
 
 Scene::~Scene() {}
@@ -89,6 +89,7 @@ void Scene::updateBuffer() {
     lightsBuffer.clear();
     materialsBuffer.clear();
     std::vector<Triangle> trs;
+    int triangleCnt = 0;
     for(auto mesh : meshes) {
         for(unsigned int i = 0; i < mesh.indices.size(); i += 3) {
             trianglesBuffer.push_back(
@@ -99,10 +100,11 @@ void Scene::updateBuffer() {
                 ));
             trs.push_back(
                 Triangle(mesh.vertices[mesh.indices[i]].position,
-                mesh.vertices[mesh.indices[i + 1]].position,
-                mesh.vertices[mesh.indices[i + 2]].position,
-                i / 3
-            ));
+                    mesh.vertices[mesh.indices[i + 1]].position,
+                    mesh.vertices[mesh.indices[i + 2]].position,
+                    triangleCnt
+                ));
+            triangleCnt ++;
         }
     }
     bvh = BVH(trs);
@@ -145,4 +147,6 @@ void Scene::setBuffer(Shader &shader) {
     shader.addSSBO("lightBuffer", lightsBuffer.data(), lightsBuffer.size() * sizeof(float), 1);    
     shader.addSSBO("materialBuffer", materialsBuffer.data(), materialsBuffer.size() * sizeof(float), 2);
     shader.addSSBO("triangleBuffer", trianglesBuffer.data(), trianglesBuffer.size() * sizeof(TriangleData), 3);
+    std::vector<IntOrFloat> bvhdata = bvh.getData();
+    shader.addSSBO("BVH", bvhdata.data(), bvhdata.size() * sizeof(IntOrFloat), 4);
 }

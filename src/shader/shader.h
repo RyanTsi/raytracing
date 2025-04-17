@@ -14,9 +14,9 @@
 class Shader {
 private:
     // 程序ID
-    GLuint ID;
     std::unordered_map<std::string, SSBO> SSBOs;
 public:
+    GLuint ID;
     // 构造器读取并构建着色器
     Shader(const char* vertexPath, const char* fragmentPath);
     void use();

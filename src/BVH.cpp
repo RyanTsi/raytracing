@@ -44,9 +44,11 @@ BVHNode* BVH::buildBVH(int start, int end, int axis) {
     }
     node.aabb = aabb;
 
+    nodes.push_back(node);
+    BVHNode *cur = &nodes.back();
     int count = end - start;
     if (count == 1) {
-        node.atom = &triangles[start];
+        cur->atom = &triangles[start];
     } else {
         // 按照指定轴排序
         std::sort(triangles.begin() + start, triangles.begin() + end,
@@ -55,11 +57,42 @@ BVHNode* BVH::buildBVH(int start, int end, int axis) {
                     });
         // 分割
         int mid = start + count / 2;
-        node.ls = buildBVH(start, mid, (axis + 1) % 3);
-        node.rs = buildBVH(mid, end, (axis + 1) % 3);
+        cur->ls = buildBVH(start, mid, (axis + 1) % 3);
+        cur->rs = buildBVH(mid, end, (axis + 1) % 3);
     }
 
     // 添加到节点数组
-    nodes.push_back(node);
-    return &nodes.back();
+    return cur;
+}
+
+std::vector<IntOrFloat> BVH::getData() {
+    std::vector<IntOrFloat> bvhdata;
+    for(const auto &i : nodes) {
+        bvhdata.push_back(i.aabb.mi.x);
+        bvhdata.push_back(i.aabb.mi.y);
+        bvhdata.push_back(i.aabb.mi.z);
+        bvhdata.push_back(0);
+        bvhdata.push_back(i.aabb.mx.x);
+        bvhdata.push_back(i.aabb.mx.y);
+        bvhdata.push_back(i.aabb.mx.z);
+        bvhdata.push_back(0);
+        if(i.ls) {
+            bvhdata.push_back(int(i.ls - &nodes[0]));
+        } else {
+            bvhdata.push_back(-1);
+        }
+        if(i.rs) {
+            bvhdata.push_back(int(i.rs - &nodes[0]));
+        } else {
+            bvhdata.push_back(-1);
+        }
+        if(i.atom) {
+            bvhdata.push_back(i.atom->id);
+            bvhdata.push_back(1);
+        } else {
+            bvhdata.push_back(-1);
+            bvhdata.push_back(0);
+        }
+    }
+    return bvhdata;
 }
