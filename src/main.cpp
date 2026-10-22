@@ -19,6 +19,7 @@
 #include <glad/gl.h>
 #include <GLFW/glfw3.h>
 #include "model/scene.h"
+#include "mouse_look.h"
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
@@ -258,44 +259,136 @@ void capture(const fs::path& path,const Targets& t,float exposure,const Options&
     std::cout<<"Saved "<<path.u8string()<<" ("<<t.width<<"x"<<t.height<<", "<<t.samples<<" spp)\n";
 }
 struct CameraInput {
+    explicit CameraInput(GLFWwindow* target) : window(target) {
+        previousUser=glfwGetWindowUserPointer(window);
+        glfwSetWindowUserPointer(window,this);
+        previousCursor=glfwSetCursorPosCallback(window,cursor);
+        previousFocus=glfwSetWindowFocusCallback(window,focus);
+    }
+    ~CameraInput() {
+        motion.end();
+        looking=false;
+        if (glfwGetInputMode(window,GLFW_CURSOR)==GLFW_CURSOR_DISABLED)
+            glfwSetInputMode(window,GLFW_CURSOR,GLFW_CURSOR_NORMAL);
+        glfwSetCursorPosCallback(window,previousCursor);
+        glfwSetWindowFocusCallback(window,previousFocus);
+        glfwSetWindowUserPointer(window,previousUser);
+    }
+    CameraInput(const CameraInput&)=delete;
+    CameraInput& operator=(const CameraInput&)=delete;
     bool looking=false;
-    bool skipNextLookSample=false;
-    double lastX=0,lastY=0;
+    bool focusLost=false,requireRelease=false;
+    MouseLook motion;
+private:
+    GLFWwindow* window;
+    void* previousUser=nullptr;
+    GLFWcursorposfun previousCursor=nullptr;
+    GLFWwindowfocusfun previousFocus=nullptr;
+    static void cursor(GLFWwindow* window,double x,double y) {
+        auto& state=*static_cast<CameraInput*>(glfwGetWindowUserPointer(window));
+        if (state.looking) state.motion.position(x,y);
+        // A disabled cursor is an unbounded virtual coordinate. Do not send
+        // those camera coordinates to ImGui as widget pointer positions.
+        else if (state.previousCursor) state.previousCursor(window,x,y);
+    }
+    static void focus(GLFWwindow* window,int focused) {
+        auto& state=*static_cast<CameraInput*>(glfwGetWindowUserPointer(window));
+        if (!focused) { state.focusLost=true; state.motion.end(); }
+        if (state.previousFocus) state.previousFocus(window,focused);
+    }
 };
+bool applyMouseLook(Camera& camera,MouseLook& motion,float sensitivity,float precision=1.f) {
+    const auto delta=motion.consume();
+    if (delta.x==0 && delta.y==0) return false;
+    camera.yaw(float(-delta.x*sensitivity*precision));
+    camera.pitch(float(-delta.y*sensitivity*precision));
+    return true;
+}
+void setMouseLook(GLFWwindow* window,CameraInput& state,bool enabled) {
+    state.looking=false;
+    state.motion.end();
+    // Raw input is optional for GLFW camera control. The bundled Win32 backend
+    // can measure absolute WM_INPUT from its recentered OS cursor, so a physical
+    // reversal can retain the old delta sign. Standard cursor events avoid it.
+    if (glfwRawMouseMotionSupported())
+        glfwSetInputMode(window,GLFW_RAW_MOUSE_MOTION,GLFW_FALSE);
+    glfwSetInputMode(window,GLFW_CURSOR,enabled?GLFW_CURSOR_DISABLED:GLFW_CURSOR_NORMAL);
+    if (enabled) {
+        double x,y; glfwGetCursorPos(window,&x,&y);
+        state.motion.begin(x,y);
+        state.looking=true;
+    }
+}
+void testMouseLookCallbacks(GLFWwindow* window,CameraInput& state) {
+    // Exercise the installed application/ImGui callback chain without moving
+    // the user's physical mouse or requiring a particular input device.
+    auto callback=glfwSetCursorPosCallback(window,nullptr);
+    glfwSetCursorPosCallback(window,callback);
+    if (!callback) throw std::runtime_error("Camera cursor callback missing");
+    auto guiFrame=[&]() {
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+        ImGui::EndFrame();
+    };
+    Camera camera;
+    setMouseLook(window,state,true);
+    guiFrame();
+    if (glfwGetInputMode(window,GLFW_CURSOR)!=GLFW_CURSOR_DISABLED)
+        throw std::runtime_error("ImGui changed camera cursor mode");
+    if (glfwRawMouseMotionSupported() && glfwGetInputMode(window,GLFW_RAW_MOUSE_MOTION))
+        throw std::runtime_error("Camera unexpectedly enabled raw input");
+    double x,y; glfwGetCursorPos(window,&x,&y);
+    if (applyMouseLook(camera,state.motion,0.04f))
+        throw std::runtime_error("Camera moved on capture");
+    callback(window,x+40,y);
+    guiFrame();
+    if (!applyMouseLook(camera,state.motion,0.04f) || camera.front.x<=0)
+        throw std::runtime_error("Camera did not turn right");
+    float rightX=camera.front.x;
+    // Still right of the press point, but left of the last position.
+    callback(window,x+30,y);
+    guiFrame();
+    if (!applyMouseLook(camera,state.motion,0.04f) || camera.front.x>=rightX)
+        throw std::runtime_error("Camera did not reverse left");
+    const auto stopped=camera.front;
+    for (int i=0;i<4;++i) {
+        guiFrame();
+        if (applyMouseLook(camera,state.motion,0.04f) || glm::length(camera.front-stopped)>1e-7f)
+            throw std::runtime_error("Camera repeated stale mouse motion");
+    }
+    callback(window,x+30,y-20);
+    guiFrame();
+    applyMouseLook(camera,state.motion,0.04f);
+    float upY=camera.front.y;
+    callback(window,x+30,y-10);
+    guiFrame();
+    applyMouseLook(camera,state.motion,0.04f);
+    if (upY<=0 || camera.front.y>=upY) throw std::runtime_error("Camera did not reverse vertically");
+    callback(window,x+80,y); // Unconsumed movement must be discarded on release.
+    setMouseLook(window,state,false);
+    setMouseLook(window,state,true);
+    if (applyMouseLook(camera,state.motion,0.04f))
+        throw std::runtime_error("Camera replayed movement from previous drag");
+    setMouseLook(window,state,false);
+}
 bool input(GLFWwindow* window,Scene& scene,float dt,bool allowKeyboard,bool allowLook,
            CameraInput& state,float sensitivity,float moveSpeed) {
     Camera& c=scene.getCamera();
     bool changed=false;
     bool focused=glfwGetWindowAttrib(window,GLFW_FOCUSED)==GLFW_TRUE;
     bool held=glfwGetMouseButton(window,GLFW_MOUSE_BUTTON_RIGHT)==GLFW_PRESS;
+    if (state.focusLost) { state.requireRelease=true; state.focusLost=false; }
+    if (!held) state.requireRelease=false;
     // Once captured, keep the drag until release even if ImGui later requests
     // mouse input. Only a press inside the scene may start a new camera drag.
-    bool wantLook=focused && held && (state.looking || allowLook);
-    double x,y; glfwGetCursorPos(window,&x,&y);
-    if (wantLook!=state.looking) {
-        state.looking=wantLook;
-        glfwSetInputMode(window,GLFW_CURSOR,wantLook?GLFW_CURSOR_DISABLED:GLFW_CURSOR_NORMAL);
-        if (glfwRawMouseMotionSupported())
-            glfwSetInputMode(window,GLFW_RAW_MOUSE_MOTION,wantLook?GLFW_TRUE:GLFW_FALSE);
-        glfwGetCursorPos(window,&x,&y);
-        state.lastX=x; state.lastY=y;
-        state.skipNextLookSample=wantLook;
-    }
+    bool wantLook=focused && held && !state.requireRelease && (state.looking || allowLook);
+    if (wantLook!=state.looking) setMouseLook(window,state,wantLook);
     if (state.looking) {
-        if (state.skipNextLookSample) state.skipNextLookSample=false;
-        else {
-            float dx=float(x-state.lastX), dy=float(y-state.lastY);
-            // Mouse displacement already integrates motion between polls:
-            // multiplying by dt or framebuffer DPI would make it inconsistent.
-            float precision=glfwGetKey(window,GLFW_KEY_LEFT_CONTROL)==GLFW_PRESS?0.25f:1.0f;
-            if (std::isfinite(dx) && std::isfinite(dy) && (dx!=0 || dy!=0)) {
-                c.yaw(-dx*sensitivity*precision);
-                c.pitch(-dy*sensitivity*precision);
-                changed=true;
-            }
-        }
+        // Mouse displacement already integrates motion; do not multiply by dt.
+        float precision=glfwGetKey(window,GLFW_KEY_LEFT_CONTROL)==GLFW_PRESS?0.25f:1.0f;
+        changed=applyMouseLook(c,state.motion,sensitivity,precision);
     }
-    state.lastX=x; state.lastY=y;
     if (focused && allowKeyboard && dt>0.f) {
         vec3 direction(0);
         if (glfwGetKey(window,GLFW_KEY_W)==GLFW_PRESS) direction.z+=1;
@@ -352,7 +445,8 @@ int run(GLFWwindow* window,Options o) {
     Targets targets;
     Timers timers;
     bool paused=false, adaptive=true, captureRequested=false;
-    CameraInput controls;
+    CameraInput controls(window);
+    if (o.selfTest) testMouseLookCallbacks(window,controls);
     bool wasMoving=false;
     int targetSamples=4096, frames=0;
     double previous=glfwGetTime();
@@ -504,7 +598,7 @@ int run(GLFWwindow* window,Options o) {
     if (o.selfTest) {
         readHDR(targets);
         if (targets.samples!=3) throw std::runtime_error("Unexpected final history sample count");
-        std::cout<<"SELF_TEST_PASS: camera/resize/reset/HDR readback\n";
+        std::cout<<"SELF_TEST_PASS: cursor reversal/stop/recapture callbacks, camera/resize/reset/HDR readback\n";
     }
     if (!o.output.empty() && targets.width>0)
         capture(o.output,targets,o.exposure,o,scene,timers,glfwGetTime()-start);
@@ -539,7 +633,7 @@ int main(int argc,char** argv) {
         glEnable(GL_DEBUG_OUTPUT); glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS); glDebugMessageCallback(debugMessage,nullptr);
         glDisable(GL_DEPTH_TEST); glDisable(GL_BLEND); glDisable(GL_FRAMEBUFFER_SRGB);
         glfwSwapInterval(o.headless?0:1);
-        if (!o.headless) {
+        if (!o.headless || o.selfTest) {
             IMGUI_CHECKVERSION(); ImGui::CreateContext(); ui=true;
             ImGui::GetIO().IniFilename=nullptr;
             ImFontConfig font;

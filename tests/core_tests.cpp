@@ -1,5 +1,7 @@
 #include "BVH.h"
 #include "camera.h"
+#include "mouse_look.h"
+#include <limits>
 #include <cmath>
 #include <iostream>
 #include <random>
@@ -38,6 +40,36 @@ void checkBVH(const std::vector<Triangle>& tris) {
 }
 int main() {
     try {
+        MouseLook mouse;
+        mouse.position(700,400);
+        require(mouse.consume().x==0,"Uncaptured mouse moves camera");
+        mouse.begin(100,100);
+        require(mouse.consume().x==0,"Capture produces a delta");
+        mouse.position(140,110);
+        auto delta=mouse.consume();
+        require(delta.x==40 && delta.y==10,"Cursor movement not accumulated");
+        mouse.position(130,105);
+        delta=mouse.consume();
+        require(delta.x==-10 && delta.y==-5,"Reversal measured from press point");
+        for (int i=0;i<4;++i) {
+            delta=mouse.consume();
+            require(delta.x==0 && delta.y==0,"Stationary frame repeats motion");
+        }
+        mouse.position(120,100); mouse.position(110,90);
+        delta=mouse.consume();
+        require(delta.x==-20 && delta.y==-15,"Batched cursor events lose movement");
+        mouse.position(800,500);
+        mouse.end();
+        mouse.begin(200,200);
+        delta=mouse.consume();
+        require(delta.x==0 && delta.y==0,"Recapture replays pending motion");
+        mouse.position(std::numeric_limits<double>::infinity(),0);
+        mouse.position(500,500);
+        delta=mouse.consume();
+        require(delta.x==0 && delta.y==0,"Invalid coordinate poisons mouse baseline");
+        mouse.position(490,480);
+        delta=mouse.consume();
+        require(delta.x==-10 && delta.y==-20,"Mouse cannot recover after invalid position");
         checkBVH({});
         checkBVH({Triangle(vec3(0),vec3(1,0,0),vec3(0,1,0),0)});
         std::vector<Triangle> random,coincident;
