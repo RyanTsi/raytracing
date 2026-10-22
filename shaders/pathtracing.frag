@@ -1,482 +1,334 @@
-#version 460 core
-
-#define maxDep 10
-#define sampCnt 4
-#define STACKDEEP 64
-uniform int A;
-
-const float PI = 3.14159265358979323846; 
-const float EPSILON = 0.00001;
-
+#version 430 core
+const float PI = 3.141592653589793;
+const float INF = 1e30;
+const int STACK_SIZE = 64;
 in vec2 screen_uv;
 out vec4 FragColor;
-
-uniform float iTime;
-
-uniform int frameCount; // 当前帧数
-#define MaxFrameCount 1000;
-uniform sampler2D previousFrame; // 上一帧的累积结果
-uniform mat4 jitterMatrix;
-
-struct Camera {
-    vec3 position;
-    vec3 front;
-    vec3 up;
-    float fov;
-    float aspectRatio;
-};
-
+uniform sampler2D previousFrame;
+uniform sampler2DArray colorTextures, dataTextures;
+uniform int debugView;
+uniform int frameCount, maxBounces, rngSeed;
+uniform bool useNEE, useMIS, useBVH, uniformSampling;
+uniform float rayEpsilon, environmentStrength;
+struct Camera { vec3 position, front, up; float fov, aspectRatio; };
 uniform Camera uCamera;
-
-vec2 seed = vec2(0);
-
-float rand(vec2 co) {
-    float res = fract((sin(dot(co * screen_uv + iTime + seed, vec2(82.9898, 78.233)))) * 43758.5453123);
-    return res;
+struct Material { vec4 baseColor; float roughness, metallic, opacity; };
+struct TextureMaterial { ivec4 maps0, maps1; vec4 parameters; };
+struct Light { vec4 center, normal, a_vec, color; float a_len, b_len, power; };
+struct TriangleData { float position[9]; float normal[9]; float uv[6]; uint materialIdx; };
+struct BVHNode { vec4 mi, mx; int ls, rs, atom, isleaf; };
+layout(std430, binding=1) readonly buffer lightBuffer { Light lights[]; };
+layout(std430, binding=2) readonly buffer materialBuffer { Material materials[]; };
+layout(std430, binding=3) readonly buffer triangleBuffer { TriangleData triangles_Data[]; };
+layout(std430, binding=4) readonly buffer BVH { BVHNode nodes[]; };
+layout(std430, binding=6) readonly buffer textureMaterialBuffer { TextureMaterial textureMaterials[]; };
+struct Ray { vec3 ori, dir; };
+struct Hit { vec3 p, n, gn; float t; uint material; bool light; int primitive; vec2 uv; };
+uint rng;
+uint alphaSeed;
+uint hash(uint v) { v ^= v >> 16; v *= 0x7feb352du; v ^= v >> 15; v *= 0x846ca68bu; return v ^ (v >> 16); }
+float random() {
+    rng = rng * 747796405u + 2891336453u;
+    uint word = ((rng >> ((rng >> 28u) + 4u)) ^ rng) * 277803737u;
+    return float((word ^ (word >> 22u)) >> 8) * (1.0 / 16777216.0);
 }
-
-vec2 rand2(vec2 p) {
-    p = vec2(rand(p), rand(p * screen_uv * 97.831));
-    return -1.0 + 2.0 * p;
+vec3 localToWorld(vec3 v, vec3 n) {
+    vec3 t = normalize(cross(abs(n.z) < 0.999 ? vec3(0,0,1) : vec3(0,1,0), n));
+    return normalize(t*v.x + cross(n,t)*v.y + n*v.z);
 }
-
-vec3 randomInHalfSphere(vec3 normal, vec3 position) {
-    float phi = acos(rand(normal.zx * 7.25 + position.xy * 9.17));
-    float theta = rand(normal.xz * 7.97 + position.xy * 17.27) * 2 * PI;
-    vec3  u = normalize(vec3(normal.y, -normal.x, 0));
-    vec3  v = normalize(cross(normal, u));
-    float x = cos(theta) * cos(phi);
-    float y = sin(theta) * cos(phi);
-    float z = sin(phi);
-    return normalize(u * x + y * v + z * normal);
-}
-
-struct Material {
-    vec4 baseColor;
-    float roughness;
-    float metallic;
-    float opacity;
-};
-
-struct Light {
-    vec4 center;
-    vec4 normal;
-    vec4 a_vec;
-    vec4 color;
-    float a_len;
-    float b_len;
-    float power;
-};
-
-struct Vertex {
-    vec3 position;
-    vec3 normal;
-    vec2 texCoords;
-};
-
-struct Triangle {
-    Vertex vert[3];
-    uint materialIdx;
-};
-
-struct TriangleData {
-    float position[9];
-    float normal[9];
-    float uv[6];
-    uint materialIdx;
-};
-
-struct BVHNode {
-    vec4 mi;
-    vec4 mx;
-    int ls;
-    int rs;
-    int atom;
-    int isleaf;
-};
-
-
-layout(std430, binding = 1) buffer lightBuffer {
-    Light lights[];
-};
-
-layout(std430, binding = 2) buffer materialBuffer {
-    Material materials[];
-};
-
-layout(std430, binding = 3) buffer triangleBuffer {
-    TriangleData triangles_Data[];
-};
-
-layout(std430, binding = 4) buffer BVH {
-    BVHNode nodes[];
-};
-
-Triangle formTriangleData(uint idx) {
-    TriangleData data = triangles_Data[idx];
-    Triangle triangle;
-    for(uint i = 0; i < 3; i ++) {
-        triangle.vert[i].position = vec3(data.position[i * 3 + 0], data.position[i * 3 + 1], data.position[i * 3 + 2]);
-        triangle.vert[i].normal = vec3(data.normal[i * 3 + 0], data.normal[i * 3 + 1], data.normal[i * 3 + 2]);
-        if(i < 2) {
-            triangle.vert[i].texCoords = vec2(data.uv[i * 3 + 0], data.uv[i * 3 + 1]);
-        }
-    }
-    triangle.materialIdx = data.materialIdx;
-    return triangle;
-};
-
-struct Ray {
-    vec3 ori;
-    vec3 dir;
-};
-
-struct HitRecord {
-    vec3 p;
-    vec3 normal;
-    float dis;
-    uint materialIdx;
-    bool isLight;
-};
-
-// 判断射线是否与 AABB 相交
-bool rayAABBIntersect(Ray ray, vec3 aabbMin, vec3 aabbMax, inout float tMin, inout float tMax) {
-    vec3 invDir = 1.0 / ray.dir;
-    vec3 t0 = (aabbMin - ray.ori) * invDir;
-    vec3 t1 = (aabbMax - ray.ori) * invDir;
-
-    vec3 tNear = min(t0, t1);
-    vec3 tFar  = max(t0, t1);
-
-    tMin = max(max(tNear.x, tNear.y), tNear.z);
-    tMax = min(min(tFar.x, tFar.y), tFar.z);
-
-    return tMax + EPSILON > max(tMin, 0.0);
-}
-
-// Schlick近似Fresnel项
-vec3 fresnelSchlick(float cosTheta, vec3 F0) {
-    return F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0);
-}
-
-// GGX NDF
-float DistributionGGX(vec3 N, vec3 H, float roughness) {
-    float a2 = roughness * roughness;
-    float NdotH = max(dot(N, H), 0.0);
-    float NdotH2 = NdotH * NdotH;
-    float nom   = a2;
-    float denom = (NdotH2 * (a2 - 1.0) + 1.0);
-    denom = PI * denom * denom;
-    return nom / denom;
-}
-
-// 几何遮蔽函数（Smith's Schlick-GGX）
-float GeometrySchlickGGX(float NdotV, float roughness) {
-    float r = (roughness + 1.0);
-    float k = (r * r) / 8.0;
-
-    float nom   = NdotV;
-    float denom = NdotV * (1.0 - k) + k;
-
-    return nom / denom;
-}
-
-float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness) {
-    float NdotV = max(dot(N, V), 0.0);
-    float NdotL = max(dot(N, L), 0.0);
-    float ggx2 = GeometrySchlickGGX(NdotV, roughness);
-    float ggx1 = GeometrySchlickGGX(NdotL, roughness);
-
-    return ggx1 * ggx2;
-}
-
-
-vec3 calBRDF(vec3 V, vec3 L, vec3 N, Material material) {
-    vec3 H = normalize(V + L); // 半角向量
-    // 基础颜色
-    vec3 albedo = material.baseColor.rgb;
-    // Fresnel项
-    vec3 F0 = mix(vec3(0.04), albedo, material.metallic);
-    vec3 F = fresnelSchlick(max(dot(H, V), 0.0), F0);
-    // 粗糙度
-    float roughness = material.roughness;
-    // NDF
-    float D = DistributionGGX(N, H, roughness);
-    // 几何遮蔽
-    float G = GeometrySmith(N, V, L, roughness);
-    // 镜面反射部分
-    vec3 numerator = D * G * F;
-    float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + EPSILON;
-    vec3 specular = numerator / denominator;
-    // 漫反射部分
-    vec3 kD = vec3(1.0) - F;
-    kD *= 1.0 - material.metallic;
-    vec3 diffuse = albedo / PI;
-    // 最终结果
-    float NdotL = max(dot(N, L), 0.0);
-    return kD * diffuse + specular;
-}
-
-struct RayStackEntry {
-    Ray ray;
-    HitRecord hitrecord;
-};
-
-Ray calFirstRay() {
-    vec2 ndc_uv = screen_uv * 2 - 1.0;
-    float ratio_y = tan(uCamera.fov / 2.0);
-    float ratio_x = ratio_y * uCamera.aspectRatio;
-    vec3 right = normalize(cross(uCamera.front, uCamera.up));
-    Ray ray;
-    ray.ori = uCamera.position;
-    ray.dir = normalize(
-        uCamera.front +
-        right * ndc_uv.x * ratio_x +
-        uCamera.up * ndc_uv.y * ratio_y
-    );
-    return ray;
-}
-
-bool intersectTriangle(Ray ray, Triangle triangle, inout HitRecord hitrecord) {
-    vec3 a = triangle.vert[0].position, b = triangle.vert[1].position, c = triangle.vert[2].position;
-    vec3 e1 = b - a, e2 = c - a;
-    vec3 normal = normalize(cross(e1, e2));
-    vec3 h = cross(ray.dir, e2);
-    float det = dot(e1, h);
-    if(det > -EPSILON && det < EPSILON) {
-        return false;
-    }
-    float k = dot(normal, a - ray.ori) / dot(normal, ray.dir);
-    vec3  p = ray.ori + k * ray.dir;
-    float s = dot(cross(e1, e2), normal);
-    float v = dot(cross((p - a), e2), normal) / s;
-    float w = dot(cross(e1, (p - a)), normal) / s;
-    float u = 1 - v - w;
-    if(k > EPSILON && v > 0 && w > 0 && v + w < 1 && k < hitrecord.dis) {
-        hitrecord.p = p;
-        hitrecord.normal = normalize(u * triangle.vert[0].normal + v * triangle.vert[1].normal + w * triangle.vert[2].normal);
-        hitrecord.dis = k;
-        hitrecord.materialIdx = triangle.materialIdx;
-        hitrecord.isLight = false;
-        return true;
-    } else {
-        return false;
-    }
-}
-
-// 遍历 BVH 树
-bool traverseBVH(Ray ray, inout HitRecord hitrecord) {
-
-    int stack[STACKDEEP]; // 模拟递归的堆栈
-    int stackPtr = 0;
-    
-    stack[stackPtr++] = 0; // 从根节点开始
-    bool res = false;
-    while (stackPtr > 0) {
-        int nodeIdx = stack[--stackPtr];
-        BVHNode node = nodes[nodeIdx];
-
-        // 检查射线是否与当前节点的 AABB 相交
-        float tMin = 0.0, tMax = 1e30;
-        if (!rayAABBIntersect(ray, node.mi.xyz, node.mx.xyz, tMin, tMax)) {
-            continue; // 如果不相交，跳过该节点
-        }
-
-        // 如果是叶子节点，返回对应几何体的索引
-        if (node.isleaf == 1) {
-            res = intersectTriangle(ray, formTriangleData(node.atom), hitrecord) || res;
+Hit emptyHit(float limit) { return Hit(vec3(0),vec3(0),vec3(0),limit,0u,false,2147483647,vec2(0)); }
+bool boxHit(Ray r, BVHNode b, float limit, out float nearT) {
+    nearT = 0.0;
+    float farT = limit;
+    // Explicit parallel handling avoids 0 * infinity on box planes.
+    for (int a=0; a<3; ++a) {
+        if (abs(r.dir[a]) < 1e-20) {
+            if (r.ori[a] < b.mi[a] || r.ori[a] > b.mx[a]) return false;
         } else {
-            // 否则，将左右子节点压入堆栈
-            if(node.ls != -1) {
-                stack[stackPtr++] = node.ls;
-            }
-            if(node.rs != -1) {
-                stack[stackPtr++] = node.rs;
-            }
+            float t0 = (b.mi[a]-r.ori[a])/r.dir[a], t1 = (b.mx[a]-r.ori[a])/r.dir[a];
+            nearT = max(nearT, min(t0,t1)); farT = min(farT, max(t0,t1));
+            if (farT < nearT) return false;
         }
-
     }
-    return res;
+    return farT >= nearT;
 }
-
-bool intersectLight(Ray ray, uint lightIdx, inout HitRecord hitrecord) {
-    Light light = lights[lightIdx];
-    vec3 u = light.a_vec.xyz, v = normalize(cross(light.a_vec.xyz, light.normal.xyz));
-    float det = dot(cross(ray.dir, u), v);
-    if(det > -EPSILON && det < EPSILON) {
-        return false;
-    }
-    float r =  dot(light.normal.xyz, ray.dir);
-    if(r > 0) {
-        return false;
-    }
-    float k = dot(light.normal.xyz, light.center.xyz - ray.ori) / r;
-    vec3 p = ray.ori + k * ray.dir;
-    vec3 D = p - light.center.xyz;
-    if(k > EPSILON && k < hitrecord.dis && 2.0 * abs(dot(D, u)) < light.a_len && 2.0 * abs(dot(D, v)) < light.b_len) {
-        hitrecord.p = ray.ori + ray.dir * k;
-        hitrecord.normal = light.normal.xyz;
-        hitrecord.dis = k;
-        hitrecord.materialIdx = lightIdx;
-        hitrecord.isLight = true;
-        return true;
-    } else {
-        return false;
-    }
+vec3 positionAt(TriangleData t, int i) { return vec3(t.position[i*3],t.position[i*3+1],t.position[i*3+2]); }
+vec3 normalAt(TriangleData t, int i) { return vec3(t.normal[i*3],t.normal[i*3+1],t.normal[i*3+2]); }
+vec2 uvAt(TriangleData t,int i) { return vec2(t.uv[i*2],t.uv[i*2+1]); }
+vec4 colorMap(int layer,vec2 uv) { return textureLod(colorTextures,vec3(uv,float(layer)),0.0); }
+vec4 dataMap(int layer,vec2 uv) { return textureLod(dataTextures,vec3(uv,float(layer)),0.0); }
+float opacityAt(uint material,vec2 uv) {
+    TextureMaterial tm=textureMaterials[material];
+    float alpha=materials[material].opacity;
+    if (tm.maps0.x>=0) alpha*=colorMap(tm.maps0.x,uv).a;
+    if (tm.maps1.z>=0) alpha*=dataMap(tm.maps1.z,uv).r;
+    return clamp(alpha,0.0,1.0);
 }
-
-vec3 trace(Ray r0, HitRecord h0) {
-    RayStackEntry stack[maxDep];
-    int stackTop = -1;
-    stack[++stackTop] = RayStackEntry(r0, h0);
-    vec3 res = vec3(0);
-    while(stackTop < A) {
-        bool hit = false;
-        Ray ray_in = stack[stackTop].ray;
-        vec3 color = vec3(0);
-        if(traverseBVH(ray_in, stack[stackTop].hitrecord)) {
-            hit = true;
+bool triangleHit(Ray r, int index, inout Hit hit) {
+    TriangleData t = triangles_Data[index];
+    vec3 a=positionAt(t,0), e1=positionAt(t,1)-a, e2=positionAt(t,2)-a;
+    vec3 p=cross(r.dir,e2);
+    float det=dot(e1,p);
+    // Relative determinant threshold also handles tiny imported geometry.
+    if (abs(det) <= 1e-8 * length(e1) * length(e2)) return false;
+    vec3 s=r.ori-a;
+    float u=dot(s,p)/det;
+    if (u < 0.0 || u > 1.0) return false;
+    vec3 q=cross(s,e1);
+    float v=dot(r.dir,q)/det;
+    if (v < 0.0 || u+v > 1.0) return false;
+    float distance=dot(e2,q)/det;
+    if (distance <= rayEpsilon*0.1 || distance > hit.t ||
+        (distance == hit.t && index >= hit.primitive)) return false;
+    vec2 uv=uvAt(t,0)*(1.0-u-v)+uvAt(t,1)*u+uvAt(t,2)*v;
+    TextureMaterial tm=textureMaterials[t.materialIdx];
+    if (tm.maps1.w!=0) {
+        float alpha=opacityAt(t.materialIdx,uv);
+        if (tm.maps1.w==1) { if (alpha<tm.parameters.x) return false; }
+        else {
+            // Stochastic coverage is independent of traversal order. Do not
+            // advance the path RNG for rejected triangles or shadow any-hits.
+            float sampleAlpha=float(hash(alphaSeed ^ hash(uint(index))))*(1.0/4294967296.0);
+            if (sampleAlpha>=alpha) return false;
         }
-        if(stackTop != 0) {
-            for(uint i = 0; i < lights.length(); i ++) {
-                if(intersectLight(ray_in, i, stack[stackTop].hitrecord)) {
-                    hit = true;
+    }
+    vec3 gn=normalize(cross(e1,e2));
+    if (dot(gn,r.dir)>0.0) gn=-gn;
+    vec3 n=normalAt(t,0)*(1.0-u-v)+normalAt(t,1)*u+normalAt(t,2)*v;
+    n = dot(n,n)>1e-16 ? normalize(n) : gn;
+    if (dot(n,gn)<0.0) n=-n;
+    if (dot(n,-r.dir)<=0.0) n=gn;
+    hit=Hit(r.ori+r.dir*distance,n,gn,distance,t.materialIdx,false,index,uv);
+    return true;
+}
+bool geometryHit(Ray r, inout Hit hit, bool anyHit) {
+    bool found=false;
+    if (!useBVH) {
+        for (int i=0; i<triangles_Data.length(); ++i) {
+            if (triangleHit(r,i,hit)) { found=true; if (anyHit) return true; }
+        }
+        return found;
+    }
+    if (nodes.length()==0) return false;
+    int stack[STACK_SIZE], sp=0;
+    stack[sp++]=0;
+    while (sp>0) {
+        int idx=stack[--sp];
+        BVHNode node=nodes[idx];
+        float entry;
+        if (!boxHit(r,node,hit.t,entry)) continue;
+        if (node.isleaf!=0) {
+            if (triangleHit(r,node.atom,hit)) { found=true; if (anyHit) return true; }
+        } else {
+            float tl,tr;
+            bool hl=boxHit(r,nodes[node.ls],hit.t,tl);
+            bool hr=boxHit(r,nodes[node.rs],hit.t,tr);
+            // Far child first, so the near child tightens the closest-hit limit.
+            if (hl && hr) {
+                stack[sp++]=tl<tr ? node.rs : node.ls;
+                stack[sp++]=tl<tr ? node.ls : node.rs;
+            } else if (hl) stack[sp++]=node.ls;
+            else if (hr) stack[sp++]=node.rs;
+        }
+    }
+    return found;
+}
+bool lightHit(Ray r, int i, inout Hit hit) {
+    Light l=lights[i];
+    float den=dot(l.normal.xyz,r.dir);
+    if (abs(den)<1e-8) return false;
+    float t=dot(l.normal.xyz,l.center.xyz-r.ori)/den;
+    if (t<=rayEpsilon*0.1 || t>=hit.t) return false;
+    vec3 d=r.ori+r.dir*t-l.center.xyz;
+    vec3 b=cross(l.normal.xyz,l.a_vec.xyz);
+    if (abs(dot(d,l.a_vec.xyz))>l.a_len*0.5 || abs(dot(d,b))>l.b_len*0.5) return false;
+    hit=Hit(r.ori+r.dir*t,l.normal.xyz,l.normal.xyz,t,uint(i),true,-1,vec2(0));
+    return true;
+}
+bool sceneHit(Ray r, inout Hit h, bool anyHit) {
+    alphaSeed=hash(rng ^ floatBitsToUint(r.dir.x) ^ hash(floatBitsToUint(r.dir.y)) ^ hash(floatBitsToUint(r.dir.z)));
+    bool found=geometryHit(r,h,anyHit);
+    if (found && anyHit) return true;
+    for (int i=0; i<lights.length(); ++i) {
+        if (lightHit(r,i,h)) { found=true; if (anyHit) return true; }
+    }
+    return found;
+}
+Material surfaceMaterial(inout Hit hit,out vec3 dielectricF0,out float occlusion) {
+    Material m=materials[hit.material];
+    TextureMaterial tm=textureMaterials[hit.material];
+    if (tm.maps0.x>=0) m.baseColor.rgb*=colorMap(tm.maps0.x,hit.uv).rgb;
+    if (tm.maps0.z>=0) m.roughness*=dataMap(tm.maps0.z,hit.uv)[int(tm.parameters.z)];
+    if (tm.maps0.w>=0) m.metallic*=dataMap(tm.maps0.w,hit.uv)[int(tm.parameters.w)];
+    m.roughness=clamp(m.roughness,0.045,1.0); m.metallic=clamp(m.metallic,0.0,1.0);
+    dielectricF0=vec3(0.04);
+    if (tm.maps1.x>=0) dielectricF0*=dataMap(tm.maps1.x,hit.uv).rgb;
+    occlusion=tm.maps1.y>=0 ? dataMap(tm.maps1.y,hit.uv).r : 1.0;
+    if (tm.maps0.y>=0) {
+        TriangleData t=triangles_Data[hit.primitive];
+        vec3 e1=positionAt(t,1)-positionAt(t,0), e2=positionAt(t,2)-positionAt(t,0);
+        vec2 d1=uvAt(t,1)-uvAt(t,0), d2=uvAt(t,2)-uvAt(t,0);
+        float determinant=d1.x*d2.y-d1.y*d2.x;
+        if (abs(determinant)>1e-12) {
+            vec3 tangent=(e1*d2.y-e2*d1.y)/determinant;
+            tangent-=hit.n*dot(tangent,hit.n);
+            if (dot(tangent,tangent)>1e-16) {
+                tangent=normalize(tangent);
+                vec3 bitangent=(e2*d1.x-e1*d2.x)/determinant;
+                float handedness=dot(cross(tangent,bitangent),hit.n)<0.0 ? -1.0 : 1.0;
+                bitangent=normalize(cross(hit.n,tangent))*handedness;
+                vec3 normal=dataMap(tm.maps0.y,hit.uv).rgb*2.0-1.0;
+                normal.xy*=tm.parameters.y;
+                if (dot(normal,normal)>1e-12) {
+                    normal=normalize(tangent*normal.x+bitangent*normal.y+hit.n*normal.z);
+                    if (dot(normal,hit.gn)>0.0) hit.n=normal;
                 }
             }
         }
-        if(hit) {
-            if(stack[stackTop].hitrecord.isLight == true) {
-                break;
-            } else {
-                if(stackTop + 1 == A) {
-                    break;
-                }
-                Ray ray_out = Ray(stack[stackTop].hitrecord.p + EPSILON * stack[stackTop].hitrecord.normal, randomInHalfSphere(stack[stackTop].hitrecord.normal, stack[stackTop].hitrecord.p));
-                float rate = materials[stack[stackTop].hitrecord.materialIdx].metallic * 0.1;
-                ray_out.dir = normalize((1 - rate) * ray_out.dir + rate * (2 * stack[stackTop].hitrecord.normal + ray_in.dir));
-                HitRecord h1 = HitRecord(vec3(0), vec3(0), 1e12, 0, false);
-                stack[++stackTop] = RayStackEntry(ray_out, h1);
-            }
-        } else {
+    }
+    return m;
+}
+vec3 fresnel(float cosTheta, vec3 f0) { return f0+(1.0-f0)*pow(clamp(1.0-cosTheta,0.0,1.0),5.0); }
+float ggxD(float nh, float alpha) {
+    float a2=alpha*alpha, d=nh*nh*(a2-1.0)+1.0;
+    return a2/(PI*d*d);
+}
+float smithG1(float nv, float alpha) {
+    return 2.0*nv/(nv+sqrt(alpha*alpha+(1.0-alpha*alpha)*nv*nv));
+}
+float specProbability(Material m) { return mix(0.25,0.85,m.metallic); }
+vec3 bsdf(vec3 n, vec3 v, vec3 l, Material m, vec3 dielectricF0, out float pdf) {
+    float nv=dot(n,v), nl=dot(n,l);
+    pdf=0.0;
+    if (nv<=0.0 || nl<=0.0 || dot(v+l,v+l)<1e-16) return vec3(0);
+    vec3 h=normalize(v+l);
+    float nh=max(dot(n,h),0.0), vh=max(dot(v,h),1e-8);
+    float alpha=m.roughness*m.roughness;
+    float d=ggxD(nh,alpha);
+    vec3 f=fresnel(vh,mix(dielectricF0,m.baseColor.rgb,m.metallic));
+    vec3 diffuse=(1.0-f)*(1.0-m.metallic)*m.baseColor.rgb/PI;
+    vec3 spec=d*smithG1(nv,alpha)*smithG1(nl,alpha)*f/(4.0*nv*nl);
+    float p=specProbability(m);
+    pdf=uniformSampling ? 1.0/(2.0*PI) : mix(nl/PI,d*nh/(4.0*vh),p);
+    return diffuse+spec;
+}
+vec3 sampleBSDF(vec3 n, vec3 v, Material m) {
+    float selector=random(), u=random(), phi=2.0*PI*random();
+    if (uniformSampling) {
+        float z=u, r=sqrt(max(0.0,1.0-z*z));
+        return localToWorld(vec3(r*cos(phi),r*sin(phi),z),n);
+    }
+    if (selector<specProbability(m)) {
+        float alpha=m.roughness*m.roughness;
+        float z=sqrt((1.0-u)/(1.0+(alpha*alpha-1.0)*u));
+        float r=sqrt(max(0.0,1.0-z*z));
+        vec3 h=localToWorld(vec3(r*cos(phi),r*sin(phi),z),n);
+        return reflect(-v,h);
+    }
+    float r=sqrt(u);
+    return localToWorld(vec3(r*cos(phi),r*sin(phi),sqrt(1.0-u)),n);
+}
+float powerWeight(float a, float b) {
+    float scale=max(a,b);
+    a/=scale; b/=scale;
+    return (a*a)/(a*a+b*b);
+}
+float lightPDF(int i, vec3 from, vec3 to) {
+    Light l=lights[i];
+    vec3 d=to-from;
+    float distance2=dot(d,d);
+    float cosine=dot(l.normal.xyz,-normalize(d));
+    if (cosine<=0.0) return 0.0;
+    return distance2/(cosine*l.a_len*l.b_len*float(lights.length()));
+}
+vec3 trace(Ray r) {
+    vec3 radiance=vec3(0), throughput=vec3(1), previousPoint=r.ori;
+    float previousPDF=0.0;
+    for (int bounce=0; bounce<=maxBounces; ++bounce) {
+        Hit hit=emptyHit(INF);
+        if (!sceneHit(r,hit,false)) {
+            radiance+=throughput*vec3(environmentStrength);
             break;
         }
-    }
-    Ray rL = stack[stackTop].ray, rV;
-    HitRecord rec = stack[stackTop].hitrecord;
-    if(stack[stackTop].hitrecord.isLight == true) {
-        res = lights[rec.materialIdx].power * lights[rec.materialIdx].color.rgb * dot(lights[rec.materialIdx].normal.xyz, -rL.dir);
-    }
-    stackTop --;
-    while(stackTop > -1) {
-        rV = stack[stackTop].ray;
-        rec = stack[stackTop].hitrecord;
-        vec3 dirLight = vec3(0);
-        uint validCnt = 0;
-        // for(uint i = 0; i < lights.length(); i ++) {
-        //     vec3 temp = vec3(0);
-        //     for(uint t = 0; t < sampCnt; t ++) {
-        //         vec2 luv = rand2(rec.p.yz) - 0.5;
-        //         vec3 pT = lights[i].center.xyz + lights[i].a_vec.xyz * luv.x + normalize(cross(lights[i].normal.xyz, lights[i].a_vec.xyz)) * luv.y;
-        //         vec3 d = pT - rec.p;
-        //         Ray rT = Ray(rec.p, normalize(d));
-        //         HitRecord hT; hT.dis = d.length() - 5 * EPSILON;
-        //         bool hit2 = false;
-        //         // for(uint j = 0; j < triangles_Data.length(); j ++) {
-        //         //     if(intersectTriangle(rT, formTriangleData(j), hT)) {
-        //         //         hit2 = true;
-        //         //         break;
-        //         //     }
-        //         // }
-        //         if(traverseBVH(rT, hT)) {
-        //             hit2 = true;
-        //         }
-        //         if(!hit2) {
-        //             validCnt ++;
-        //             temp += lights[i].color.rgb *
-        //                     calBRDF(-rV.dir, rT.dir, rec.normal, materials[rec.materialIdx]) *
-        //                     dot(rec.normal, rT.dir) * dot(lights[i].normal.xyz, -rT.dir) / dot(d, d);
-        //         }
-        //     }
-        //     dirLight += temp * lights[i].power * lights[i].a_len * lights[i].b_len * validCnt / (sampCnt * sampCnt);
-        // }
-        stackTop --;
-        res = dirLight + res * calBRDF(-rV.dir, rL.dir, rec.normal, materials[rec.materialIdx]) * dot(rec.normal, rL.dir) * 2 * PI;
-        rL = rV;
-    }
-
-    return res;
-}
-
-vec4 bilateralBlur(sampler2D tex, vec2 uv, vec2 texelSize) {
-    vec4 color = vec4(0.0);
-    float weightSum = 0.0;
-
-    // 空间域权重
-    float spatialSigma = 1.5;
-    // 范围域权重
-    float rangeSigma = 0.1;
-
-    for (int x = -1; x <= 1; ++x) {
-        for (int y = -1; y <= 1; ++y) {
-            vec2 offset = vec2(x, y) * texelSize;
-            vec4 sampleColor = texture(tex, uv + offset);
-            float spatialWeight = exp(-(dot(offset, offset) / (2.0 * spatialSigma * spatialSigma)));
-            float rangeWeight = exp(-length(sampleColor - texture(tex, uv)) / (2.0 * rangeSigma * rangeSigma));
-            float weight = spatialWeight * rangeWeight;
-
-            color += sampleColor * weight;
-            weightSum += weight;
+        if (hit.light) {
+            Light l=lights[hit.material];
+            if (dot(l.normal.xyz,-r.dir)>0.0) {
+                float weight=1.0;
+                if (bounce>0 && useNEE && useMIS)
+                    weight=powerWeight(previousPDF,lightPDF(int(hit.material),previousPoint,hit.p));
+                else if (bounce>0 && useNEE) weight=0.0;
+                // Emitted radiance has no extra cosine factor.
+                radiance+=throughput*l.color.rgb*l.power*weight;
+            }
+            break;
         }
+        if (bounce==maxBounces) break;
+        vec3 dielectricF0; float occlusion;
+        Material m=surfaceMaterial(hit,dielectricF0,occlusion);
+        vec3 v=-r.dir;
+        if (useNEE && lights.length()>0) {
+            int index=min(int(random()*float(lights.length())),lights.length()-1);
+            Light l=lights[index];
+            vec3 b=cross(l.normal.xyz,l.a_vec.xyz);
+            vec3 point=l.center.xyz+(random()-0.5)*l.a_len*l.a_vec.xyz+(random()-0.5)*l.b_len*b;
+            vec3 direction=normalize(point-hit.p);
+            float nl=dot(hit.n,direction), lp=lightPDF(index,hit.p,point);
+            if (nl>0.0 && dot(hit.gn,direction)>0.0 && lp>0.0) {
+                Ray shadow=Ray(hit.p+hit.gn*rayEpsilon,direction);
+                // Aim from the offset origin to the same sampled light point.
+                vec3 sd=point-shadow.ori;
+                shadow.dir=normalize(sd);
+                Hit blocker=emptyHit(length(sd)-rayEpsilon);
+                if (!sceneHit(shadow,blocker,true)) {
+                    float bp;
+                    vec3 f=bsdf(hit.n,v,direction,m,dielectricF0,bp);
+                    float weight=useMIS ? powerWeight(lp,bp) : 1.0;
+                    radiance+=throughput*f*nl*l.color.rgb*l.power*(weight/lp);
+                }
+            }
+        }
+        vec3 direction=sampleBSDF(hit.n,v,m);
+        if (dot(hit.gn,direction)<=0.0) break;
+        float pdf;
+        vec3 f=bsdf(hit.n,v,direction,m,dielectricF0,pdf);
+        if (pdf<=1e-20) break;
+        throughput*=f*max(dot(hit.n,direction),0.0)*occlusion/pdf;
+        previousPDF=pdf; previousPoint=hit.p;
+        // Unbiased stochastic termination; hard depth still limits path length.
+        if (bounce>=3) {
+            float survival=clamp(max(throughput.r,max(throughput.g,throughput.b)),0.05,0.95);
+            if (random()>survival) break;
+            throughput/=survival;
+        }
+        r=Ray(hit.p+hit.gn*rayEpsilon,normalize(direction));
     }
-
-    return color / weightSum;
+    return radiance;
 }
-
-// 高斯模糊函数
-vec4 gaussianBlur(sampler2D tex, vec2 uv, vec2 resolution) {
-    vec4 color = vec4(0.0);
-    vec2 texelSize = 1.0 / resolution;
-
-    // 3x3 高斯核
-    vec2 offsets[9] = vec2[](
-        vec2(-texelSize.x, -texelSize.y), vec2(0.0, -texelSize.y), vec2(texelSize.x, -texelSize.y),
-        vec2(-texelSize.x, 0.0),         vec2(0.0, 0.0),          vec2(texelSize.x, 0.0),
-        vec2(-texelSize.x, texelSize.y), vec2(0.0, texelSize.y), vec2(texelSize.x, texelSize.y)
-    );
-
-    float kernel[9] = float[](
-        1.0, 2.0, 1.0,
-        2.0, 4.0, 2.0,
-        1.0, 2.0, 1.0
-    );
-
-    float weightSum = 0.0;
-    for (int i = 0; i < 9; ++i) {
-        color += texture(tex, uv + offsets[i]) * kernel[i];
-        weightSum += kernel[i];
-    }
-
-    return color / weightSum;
-}
-
-
 void main() {
-    HitRecord hitrecord;
-    hitrecord.dis = 1e12;
-    hitrecord.normal = uCamera.front;
-    Ray ray = calFirstRay();
-    vec2 resolution = vec2(1080, 720);
-    vec3 resColor;
-    // 获取上一帧的累积结果
-    // 对累积的颜色结果应用双边滤波
-    vec4 blurredColor1 = bilateralBlur(previousFrame, screen_uv, resolution);
-    vec4 blurredColor2 = gaussianBlur(previousFrame, screen_uv, resolution);
-    vec3 accumulatedColor = (0.005 * blurredColor2.rgb + 0.995 * blurredColor1.rgb);
-    if(frameCount < 2000) {
-        resColor = (accumulatedColor * frameCount + trace(ray, hitrecord)) / (frameCount + 1);
-    } else {
-        resColor = accumulatedColor;
+    ivec2 pixel=ivec2(gl_FragCoord.xy), size=textureSize(previousFrame,0);
+    uint id=uint(pixel.x)+uint(pixel.y)*uint(size.x);
+    rng=hash(id ^ hash(uint(frameCount)+uint(rngSeed)*0x9e3779b9u));
+    vec2 jitter=vec2(random(),random());
+    vec2 ndc=(vec2(pixel)+jitter)/vec2(size)*2.0-1.0;
+    vec3 right=normalize(cross(uCamera.front,uCamera.up));
+    vec3 up=normalize(cross(right,uCamera.front));
+    float scale=tan(radians(uCamera.fov)*0.5);
+    Ray ray=Ray(uCamera.position,normalize(uCamera.front+scale*(right*ndc.x*uCamera.aspectRatio+up*ndc.y)));
+    vec3 value;
+    if (debugView>0) {
+        Hit hit=emptyHit(INF);
+        if (!sceneHit(ray,hit,false)) value=vec3(0);
+        else if (hit.light) value=lights[hit.material].color.rgb;
+        else {
+            vec3 f0; float ao;
+            Material m=surfaceMaterial(hit,f0,ao);
+            value=debugView==1 ? m.baseColor.rgb : hit.n*0.5+0.5;
+        }
+    } else value=trace(ray);
+    // Read only initialized history, preserve linear HDR throughout accumulation.
+    if (frameCount>0) {
+        vec3 previous=texelFetch(previousFrame,pixel,0).rgb;
+        value=previous+(value-previous)/float(frameCount+1);
     }
-
-    FragColor = vec4(resColor, 1);
+    FragColor=vec4(value,1);
 }

@@ -1,0 +1,19 @@
+{
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "windows-release",
+      "displayName": "Windows x64 / MSVC / Release",
+      "generator": "Visual Studio 17 2022",
+      "architecture": "x64",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": { "BUILD_TESTING": "ON", "CMAKE_SUPPRESS_REGENERATION": "OFF" }
+    }
+  ],
+  "buildPresets": [
+    { "name": "windows-release", "configurePreset": "windows-release", "configuration": "Release", "jobs": 8 }
+  ],
+  "testPresets": [
+    { "name": "windows-release", "configurePreset": "windows-release", "configuration": "Release", "output": { "outputOnFailure": true } }
+  ]
+}

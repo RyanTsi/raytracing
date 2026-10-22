@@ -1,0 +1,24 @@
+name: Windows build
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  release:
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Configure
+        run: cmake --preset windows-release
+      - name: Build Release
+        run: cmake --build --preset windows-release
+      - name: CPU contracts
+        run: ctest --preset windows-release -R core_contracts
+      # Hosted Windows runners do not guarantee a hardware OpenGL 4.3 context.
+      # Run gpu_smoke and the Python image regressions on a GPU desktop.

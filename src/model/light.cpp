@@ -9,9 +9,9 @@ Light::Light(
     vec3 _color, 
     float _power
 ) : center(_center), a_len(_a_len), b_len(_b_len), power(_power) {
-    a_vec  = glm::normalize(_a_vec);
     norm   = glm::normalize(_norm);
-    color  = glm::normalize(_color);
+    a_vec  = glm::normalize(_a_vec - norm * glm::dot(_a_vec, norm));
+    color  = _color;
 }
 
 Light::~Light() {}

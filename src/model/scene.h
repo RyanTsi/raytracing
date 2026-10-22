@@ -17,7 +17,7 @@ struct TriangleData {
     float uv[6];
     GLuint materialIdx;
     TriangleData() {}
-    TriangleData(Vertex &a, Vertex &b, Vertex &c, GLuint matIdx = 0) 
+    TriangleData(const Vertex &a, const Vertex &b, const Vertex &c, GLuint matIdx = 0)
         : materialIdx(matIdx) {
         for (int i = 0; i < 3; i ++) {
             position[0 + i] = a.position[i];
@@ -34,6 +34,7 @@ struct TriangleData {
         }
     }
 };
+static_assert(sizeof(TriangleData) == 100, "GLSL std430 triangle stride");
 
 class Scene {
 private:
@@ -41,6 +42,10 @@ private:
     std::vector<Mesh> meshes;
     std::vector<Light> lights;
     std::vector<Material> materials;
+    TextureBank colorTextures{true};
+    TextureBank dataTextures{false};
+    std::vector<IntOrFloat> textureMaterialsBuffer;
+    size_t materialOffset=0, attachmentCount_=0;
     void loadScene(const std::string &path);
     void processNode(aiNode *node, const aiScene *scene);
     Mesh processMesh(aiMesh *mesh, const aiScene *scene);
@@ -55,11 +60,29 @@ private:
     void setCamera(Shader &shader);
     void setBuffer(Shader &shader);
 public:
-    Scene(const char *path);
+    Camera& getCamera() { return camera; }
+    const Camera& getCamera() const { return camera; }
+    const Camera& getHomeCamera() const { return homeCamera; }
+    size_t triangleCount() const { return trianglesBuffer.size(); }
+    size_t nodeCount() const { return bvh.nodes.size(); }
+    size_t meshCount() const { return meshes.size(); }
+    size_t materialCount() const { return materials.size(); }
+    size_t colorTextureCount() const { return colorTextures.count(); }
+    size_t dataTextureCount() const { return dataTextures.count(); }
+    size_t attachmentCount() const { return attachmentCount_; }
+    float epsilon() const { return sceneEpsilon; }
+    void drawQuad() const;
+    void prepare(Shader& shader);
+    Scene(const char *path,const std::vector<std::string>& attachments={});
     void draw(Shader &shader);
     // void setInShaderD(Shader &shader);
     // void setInShaderS(Shader &shader);
     void addLight(Light light);
     void updateBuffer();
     ~Scene();
+    Scene(const Scene&) = delete;
+    Scene& operator=(const Scene&) = delete;
+private:
+    Camera homeCamera;
+    float sceneEpsilon = 1e-4f;
 };

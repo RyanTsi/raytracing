@@ -3,7 +3,7 @@
 
 using glm::vec3;
 
-const float INF = 1e18;
+const float INF = 3.402823466e38f;
 
 class AABB {
     vec3 vmin(const vec3 &x, const vec3 &y);

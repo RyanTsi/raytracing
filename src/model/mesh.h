@@ -26,7 +26,7 @@ private:
 public:
     std::vector<Vertex> vertices;
     std::vector<unsigned int> indices;
-    const Material *material;
-    Mesh(std::vector<Vertex> _vertices, std::vector<unsigned int> _indices, const Material *_material);
+    size_t materialIndex;
+    Mesh(std::vector<Vertex> _vertices, std::vector<unsigned int> _indices, size_t materialIndex_);
     ~Mesh();
 };

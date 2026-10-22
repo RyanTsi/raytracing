@@ -27,9 +27,13 @@ public:
     mat4 getViewMatrix();
     mat4 getProjectionMatrix();
     void move(vec3 arrow);
+    // speed is expressed in scene units per second for interactive movement.
+    void move(vec3 arrow, float seconds, float multiplier = 1.0f);
     void up();
     void down();
     void pitch(float angle);
     void yaw(float angle);
     ~Camera();
+private:
+    void updateBasis();
 };

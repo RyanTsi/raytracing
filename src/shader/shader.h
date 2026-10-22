@@ -15,10 +15,15 @@ class Shader {
 private:
     // 程序ID
     std::unordered_map<std::string, SSBO> SSBOs;
+    mutable std::unordered_map<std::string, GLint> locations;
+    GLint location(const std::string& name) const;
 public:
     GLuint ID;
     // 构造器读取并构建着色器
     Shader(const char* vertexPath, const char* fragmentPath);
+    ~Shader();
+    Shader(const Shader&) = delete;
+    Shader& operator=(const Shader&) = delete;
     void use();
     void release();
     // uniform工具函数

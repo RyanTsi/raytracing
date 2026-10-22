@@ -1,18 +1,8 @@
 #include "tools.h"
-
-std::string read_file(const std::string &file_path) {
-    std::string res;
-    std::ifstream inputFile;
-    inputFile.exceptions (std::ifstream::failbit | std::ifstream::badbit);
-    try {
-        inputFile.open(file_path);
-        std::stringstream stringStream;
-        stringStream << inputFile.rdbuf();
-        inputFile.close();
-        res = stringStream.str();
-    }
-    catch(std::ifstream::failure e) {
-        std::cout << "ERROR::SHADER::FILE_NOT_SUCCESFULLY_READ" << std::endl;
-    }
-    return res;
+#include <stdexcept>
+#include <filesystem>
+std::string read_file(const std::string& path) {
+    std::ifstream file(std::filesystem::u8path(path),std::ios::binary);
+    if (!file) throw std::runtime_error("Cannot read file: "+path);
+    std::ostringstream out; out<<file.rdbuf(); return out.str();
 }
